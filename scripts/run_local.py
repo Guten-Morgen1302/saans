@@ -38,6 +38,7 @@ from saans.rules import load_rules  # noqa: E402
 from saans.school import load_school  # noqa: E402
 from saans.store import PlanStore  # noqa: E402
 from saans.summary import model_call_from_env  # noqa: E402
+from saans.trial import Trial  # noqa: E402
 from saans.telegram import TelegramMessenger  # noqa: E402
 
 STATE = ROOT / "data" / "local_state.json"
@@ -52,6 +53,10 @@ def main() -> None:
     table = ensure_table(boto3.resource("dynamodb", endpoint_url=endpoint), cfg.table_name)
     tg = TelegramMessenger(cfg.bot_token)
     tg.delete_webhook()
+    try:
+        tg.set_commands([("try", "See a demo: the plan Saans sent on 10 Nov 2025")])
+    except MessengerError as e:
+        log.warning("could not set the command menu: %s", e)
 
     model_call = model_call_from_env()
     ctx = pipeline.Context(
@@ -66,6 +71,7 @@ def main() -> None:
     rt = handlers.Runtime(cfg, deps, ctx, sensor_ids,
                           metrics=lambda outcome: log.info("heartbeat: nightly %s", outcome),
                           backup=backup)
+    trial = Trial(deps, ctx)                    # public /try demo + feedback
     log.info("Saans running locally (DynamoDB %s, summary %s). Ctrl+C to stop.",
              endpoint, "on" if model_call else "off")
 
@@ -88,7 +94,7 @@ def main() -> None:
             offset = update["update_id"] + 1
             try:
                 webhook.handle(update_event(update, cfg.webhook_secret), deps, cfg.webhook_secret,
-                               lambda day: pipeline.run_replay(deps, ctx, day))
+                               lambda day: pipeline.run_replay(deps, ctx, day), trial=trial)
             except Exception:  # noqa: BLE001
                 log.exception("update %s failed", update.get("update_id"))
 

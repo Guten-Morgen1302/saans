@@ -69,6 +69,11 @@ class TelegramMessenger:
             raise MessengerError(f"getUpdates: {body.get('error_code')} {body.get('description')}")
         return body.get("result") or []
 
+    def set_commands(self, commands: list[tuple[str, str]]) -> None:
+        """The menu Telegram shows next to the message box."""
+        self._call("setMyCommands", {"commands": [{"command": c, "description": d}
+                                                  for c, d in commands]})
+
     def delete_webhook(self) -> None:
         """Long polling and a webhook can't both be active."""
         self._call("deleteWebhook", {"drop_pending_updates": False})

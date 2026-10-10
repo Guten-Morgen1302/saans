@@ -41,6 +41,7 @@ class Runtime:
     metrics: Callable[[str], None]
     now: Callable[[], datetime] = lambda: datetime.now(IST)
     backup: pipeline.Backup | None = None
+    trial: object | None = None
 
 
 def load_stations(path: Path = ROOT / "config" / "stations.yaml") -> tuple[list[int], pipeline.Backup | None]:
@@ -84,7 +85,8 @@ def _build_runtime() -> Runtime:
              "Dimensions": [{"Name": "outcome", "Value": outcome}]},
         ])
 
-    return Runtime(cfg, deps, ctx, sensor_ids, metrics, backup=backup)
+    from saans.trial import Trial
+    return Runtime(cfg, deps, ctx, sensor_ids, metrics, backup=backup, trial=Trial(deps, ctx))
 
 
 def _rt() -> Runtime:
@@ -97,7 +99,7 @@ def _rt() -> Runtime:
 def webhook_handler(event, context):
     rt = _rt()
     return webhook.handle(event, rt.deps, rt.cfg.webhook_secret,
-                          lambda day: pipeline.run_replay(rt.deps, rt.ctx, day))
+                          lambda day: pipeline.run_replay(rt.deps, rt.ctx, day), trial=rt.trial)
 
 
 def scheduled_handler(event, context):

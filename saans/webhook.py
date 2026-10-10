@@ -36,7 +36,7 @@ def _response(status: int, body: str = "ok") -> dict:
 
 
 def handle(event: dict, deps: Deps, secret: str,
-           run_replay: Callable[[date], str]) -> dict:
+           run_replay: Callable[[date], str], trial=None) -> dict:
     headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
     if not secret or not hmac.compare_digest(headers.get("x-telegram-bot-api-secret-token", ""), secret):
         log.warning("webhook rejected: bad or missing secret token")
@@ -51,14 +51,28 @@ def handle(event: dict, deps: Deps, secret: str,
         return _response(400, "bad json")
 
     if cb := update.get("callback_query"):
-        _handle_callback(cb, deps)
+        data = cb.get("data") or ""
+        if trial and (data.startswith("try|") or data.startswith("fb|")):
+            trial.on_callback(cb)          # public demo: never touches school channels
+        else:
+            _handle_callback(cb, deps)
         return _response(200)
 
     s = deps.settings
     if msg := update.get("message"):
         user = (msg.get("from") or {}).get("id")
         chat = (msg.get("chat") or {}).get("id")
+        private = (msg.get("chat") or {}).get("type", "private") == "private"
         text = (msg.get("text") or "").strip()
+        registered = user == s.principal_user_id or user in s.admin_user_ids
+        if trial and private and (text.startswith("/try") or (text.startswith("/start") and not registered)):
+            trial.start(chat, user)
+            return _response(200)
+        if trial and text.startswith("/feedback") and user in s.admin_user_ids:
+            deps.messenger.send(chat, trial.report())
+            return _response(200)
+        if trial and private and trial.maybe_comment(chat, user, text):
+            return _response(200)
         if text.startswith("/replay"):
             if user not in s.admin_user_ids:
                 deps.messenger.send(chat, messages.system("not_registered"))
@@ -72,8 +86,13 @@ def handle(event: dict, deps: Deps, secret: str,
             log.info("replay %s requested by %s", day, user)
             deps.messenger.send(chat, f"Replay {day}: {run_replay(day)}")
             return _response(200)
-        if user == s.principal_user_id or user in s.admin_user_ids:
+        if registered:
             deps.messenger.send(chat, messages.system("help"))
+        elif not private:
+            pass                           # don't chat in groups the bot happens to be in
+        elif trial:
+            from saans.trial import PUBLIC_HELP
+            deps.messenger.send(chat, PUBLIC_HELP)
         else:
             deps.messenger.send(chat, messages.system("not_registered"))
         return _response(200)

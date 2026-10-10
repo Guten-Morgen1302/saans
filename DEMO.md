@@ -24,6 +24,7 @@ On "Poor" and "Very Poor" days (AQI 201-400), no school has to change anything, 
 
 - **Honest forecast.** Every forecast uses only data published by 16:00. Backtested on 44 school days (Oct-Dec 2025): 86% of Very Poor-or-worse days caught, 11% false alarms. On 10 Nov 2025 it warned at least 15 hours before the official GRAP III / hybrid-class order.
 - **Rules decide, AI writes.** Six rules cite EPA, CPCB and CAQM sources. A Strands Agents SDK agent writes an optional one-line summary, and a validator rejects any number, time, class or band not in the plan.
+- **Try it yourself.** Send `/try` to @SaansSchoolBot to get the real 10 Nov 2025 plan in your own chat. "Would your school use this?" feedback is collected from the teachers who tried it.
 - **Built to be trusted.** Parents never see class names (asthma counts stay private) or uncertain GRAP guesses. The notice is bilingual and every outcome is stamped on the plan. A backup data path activates when the CPCB feed stalls.
 - **Stack.** Python, Strands Agents SDK (AWS open source), DynamoDB Local, Telegram, OpenAQ/CPCB data, Gemini. It's also deployable on AWS Lambda + EventBridge + DynamoDB via the included SAM template. 210 tests.
 

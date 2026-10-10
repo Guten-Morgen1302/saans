@@ -41,7 +41,7 @@ This is how the demo runs. It uses the Strands Agents SDK (an AWS open-source to
 3. `cp .env.example .env` and fill it in. `GEMINI_API_KEY` is optional; it's free at aistudio.google.com.
 4. Start Docker Desktop, then run `docker compose up -d` to start DynamoDB Local.
 5. `python scripts/run_local.py`. Leave it running: the 18:00 plan, the 06:30 reminder and the 07:00 expiry run only while it's on.
-6. Try it: as the admin, send the bot `/replay 2025-11-10`.
+6. Try it: as the admin, send the bot `/replay 2025-11-10`. Anyone can send `/try` for a private demo in their own chat, which ends with a "Would your school use this?" question. Admins see the tally with `/feedback`.
 
 ## Deploy on AWS (optional)
 

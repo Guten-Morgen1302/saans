@@ -3,7 +3,8 @@
 Every request must carry Telegram's X-Telegram-Bot-Api-Secret-Token header,
 otherwise 401. Callbacks (Approve/Skip) and non-admin commands are accepted
 only from the stored principal; /replay only from admins. Anyone else gets
-"not registered". Handled updates always return 200 so Telegram does not
+"not registered". A tap only counts if it comes from the plan's current
+message (eng R18). Handled updates always return 200 so Telegram does not
 retry them.
 """
 
@@ -16,13 +17,18 @@ import logging
 from datetime import date
 from typing import Callable
 
-from saans import lifecycle
+from saans import lifecycle, messages
 from saans.lifecycle import Deps
 
 log = logging.getLogger(__name__)
 
-NOT_REGISTERED = "Sorry, this bot only works for registered school staff."
-HELP = "You'll get tomorrow's air plan here at 18:00 on the evening before each school day."
+OUTCOME_TOAST = {
+    "skipped": "toast_skipped",
+    "expired": "toast_expired",
+    "already_done": "toast_done",
+    "already_skipped": "toast_done",
+    "not_found": "toast_gone",
+}
 
 
 def _response(status: int, body: str = "ok") -> dict:
@@ -44,30 +50,18 @@ def handle(event: dict, deps: Deps, secret: str,
     except json.JSONDecodeError:
         return _response(400, "bad json")
 
-    s = deps.settings
     if cb := update.get("callback_query"):
-        user = (cb.get("from") or {}).get("id")
-        if user != s.principal_user_id:
-            deps.messenger.answer_callback(cb["id"], NOT_REGISTERED)
-            return _response(200)
-        try:
-            action, target, mode = lifecycle.parse_callback(cb.get("data", ""))
-        except ValueError:
-            deps.messenger.answer_callback(cb["id"], "Unknown button.")
-            return _response(200)
-        fn = lifecycle.approve if action == "approve" else lifecycle.skip
-        outcome = fn(deps, target, mode, by=user)
-        deps.messenger.answer_callback(cb["id"], _callback_text(outcome))
-        log.info("callback %s %s %s by %s -> %s", action, target, mode, user, outcome)
+        _handle_callback(cb, deps)
         return _response(200)
 
+    s = deps.settings
     if msg := update.get("message"):
         user = (msg.get("from") or {}).get("id")
         chat = (msg.get("chat") or {}).get("id")
         text = (msg.get("text") or "").strip()
         if text.startswith("/replay"):
             if user not in s.admin_user_ids:
-                deps.messenger.send(chat, NOT_REGISTERED)
+                deps.messenger.send(chat, messages.system("not_registered"))
                 return _response(200)
             parts = text.split()
             try:
@@ -79,21 +73,45 @@ def handle(event: dict, deps: Deps, secret: str,
             deps.messenger.send(chat, f"Replay {day}: {run_replay(day)}")
             return _response(200)
         if user == s.principal_user_id or user in s.admin_user_ids:
-            deps.messenger.send(chat, HELP)
+            deps.messenger.send(chat, messages.system("help"))
         else:
-            deps.messenger.send(chat, NOT_REGISTERED)
+            deps.messenger.send(chat, messages.system("not_registered"))
         return _response(200)
 
     return _response(200)  # other update types are ignored
 
 
-def _callback_text(outcome: str) -> str:
-    return {
-        "posted": "Approved. Parents and staff have been notified.",
-        "failed": "Approved, but some channels failed. See the message above.",
-        "skipped": "Skipped. Nothing was sent.",
-        "expired": "This plan expired at 07:00.",
-        "already_done": "Already approved.",
-        "already_skipped": "Already skipped.",
-        "not_found": "This plan no longer exists.",
-    }.get(outcome, "Done.")
+def _handle_callback(cb: dict, deps: Deps) -> None:
+    answer = lambda key: deps.messenger.answer_callback(cb["id"], messages.toast(key))  # noqa: E731
+    user = (cb.get("from") or {}).get("id")
+    if user != deps.settings.principal_user_id:
+        answer("not_registered")
+        return
+    try:
+        action, target, mode = lifecycle.parse_callback(cb.get("data", ""))
+    except ValueError:
+        answer("toast_unknown")
+        return
+
+    current = lifecycle.is_current(deps, target, mode, (cb.get("message") or {}).get("message_id"))
+    if current is None:
+        answer("toast_gone")
+        return
+    if not current:
+        answer("toast_replaced")
+        return
+
+    if action == "skip":
+        outcome = lifecycle.skip(deps, target, mode, by=user)
+        answer(OUTCOME_TOAST.get(outcome, "toast_done"))
+    else:
+        answered = []
+
+        def accepted():
+            answer("toast_sending")
+            answered.append(True)
+
+        outcome = lifecycle.approve(deps, target, mode, by=user, on_accepted=accepted)
+        if not answered:
+            answer(OUTCOME_TOAST.get(outcome, "toast_done"))
+    log.info("callback %s %s %s by %s -> %s", action, target, mode, user, outcome)

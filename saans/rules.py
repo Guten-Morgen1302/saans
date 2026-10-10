@@ -64,8 +64,9 @@ class Plan:
     school_hours_band: Band
     worst_band: Band
     worst_hour: time
-    header: tuple[time, time, Band] | None   # "Tomorrow HH:MM-HH:MM is {band}"
+    header: tuple[time, time, Band] | None   # "<date> · <band> HH:MM-HH:MM"
     actions: tuple[Action, ...]
+    school_day: tuple[time, time] = (time(8), time(14))
 
     @property
     def no_action(self) -> bool:
@@ -112,10 +113,10 @@ def _activity_band(act: Activity, bands: dict[int, Band]) -> Band:
     return max(bands[h] for h in hours)
 
 
-def _span(hours: list[int]) -> tuple[time, time]:
-    """First hour's start to last hour's end (gaps inside the span are included)."""
+def _span(hours: list[int], day: tuple[time, time]) -> tuple[time, time]:
+    """First hour's start to last hour's end, clamped to the school day (design 16A)."""
     end = time(max(hours) + 1) if max(hours) < 23 else time(23, 59)
-    return time(min(hours)), end
+    return max(time(min(hours)), day[0]), min(end, day[1])
 
 
 def protocol(forecast_hourly: dict[datetime, float], school: School, target: date,
@@ -130,9 +131,12 @@ def protocol(forecast_hourly: dict[datetime, float], school: School, target: dat
     school_bands = {h: by_hour[h] for h in SCHOOL_HOURS if h in by_hour}
     worst_hour = max(school_bands, key=lambda h: (school_bands[h], -h))
     worst_band = school_bands[worst_hour]
+    todays = school.activities(target.weekday())
+    day = ((min(a.start for a in todays), max(a.end for a in todays)) if todays
+           else (time(SCHOOL_HOURS.start), time(SCHOOL_HOURS.stop)))
 
     actions: list[Action] = []
-    for act in school.activities(target.weekday()):
+    for act in todays:
         applicable = [r for r in rules if r.applies_to in ACTIVITY_SCOPES and _applies(r, act, school)]
         if not applicable:
             continue
@@ -148,20 +152,19 @@ def protocol(forecast_hourly: dict[datetime, float], school: School, target: dat
         if rule.action == "windows_closed":
             hot = [h for h, b in school_bands.items() if b >= rule.trigger]
             if hot:
-                start, end = _span(hot)
+                start, end = _span(hot, day)
                 actions.append(Action(rule.id, rule.action, rule.template,
                                       max(school_bands[h] for h in hot), start, end,
                                       sources=rule.sources))
         elif rule.action == "grap_advisory" and school_band >= rule.trigger:
             actions.append(Action(rule.id, rule.action, rule.template, school_band,
-                                  time(SCHOOL_HOURS.start), time(SCHOOL_HOURS.stop),
-                                  sources=rule.sources))
+                                  day[0], day[1], sources=rule.sources))
 
     header = None
     top = [h for h, b in school_bands.items() if b == worst_band]
     if worst_band >= Band.POOR:
-        start, end = _span(top)
+        start, end = _span(top, day)
         header = (start, end, worst_band)
 
     actions.sort(key=lambda a: (a.start, a.who, a.rule_id))
-    return Plan(target, school_band, worst_band, time(worst_hour), header, tuple(actions))
+    return Plan(target, school_band, worst_band, time(worst_hour), header, tuple(actions), day)

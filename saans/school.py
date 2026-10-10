@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import time
 from pathlib import Path
 
@@ -33,9 +33,21 @@ class School:
     asthma: dict[str, int]
     weekdays: frozenset[int]
     day: tuple[Activity, ...]
+    primary_language: str = "hi"
+    indoor_venue: dict[str, dict[str, str]] = field(default_factory=dict)
 
     def activities(self, weekday: int) -> tuple[Activity, ...]:
         return self.day if weekday in self.weekdays else ()
+
+    def venue(self, activity: str, lang: str) -> str:
+        default = {"en": "a classroom", "hi": "कक्षा"}
+        return self.indoor_venue.get(activity, default).get(lang, default[lang])
+
+    def day_span(self) -> tuple[time, time] | None:
+        """First start and last end of the school day (design 16A)."""
+        if not self.day:
+            return None
+        return min(a.start for a in self.day), max(a.end for a in self.day)
 
     def hour_window(self) -> range:
         """Forecast hours this timetable needs: first start - 2h .. last end (eng R7)."""
@@ -59,10 +71,15 @@ def load_school(path: Path) -> School:
         if not act.school_wide and act.who not in raw["classes"]:
             raise ValueError(f"{act.name} is for unknown class {act.who}")
         activities.append(act)
+    lang = raw.get("primary_language", "hi")
+    if lang not in ("hi", "en"):
+        raise ValueError(f"primary_language must be 'hi' or 'en', got {lang!r}")
     return School(
         id=raw["id"],
         name=raw["name"],
         asthma={str(k): int(v) for k, v in raw["classes"].items()},
         weekdays=frozenset(raw["weekdays"]),
         day=tuple(sorted(activities, key=lambda a: (a.start, a.who))),
+        primary_language=lang,
+        indoor_venue={str(k): dict(v) for k, v in (raw.get("indoor_venue") or {}).items()},
     )

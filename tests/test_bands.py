@@ -19,6 +19,13 @@ def test_half_open_edges(pm25, expected):
 
 def test_labels():
     assert Band.VERY_POOR.label == "Very Poor"
+    assert Band.VERY_POOR.name_in("hi") == "बहुत खराब"
+
+
+def test_every_band_has_the_full_vocabulary():
+    for b in Band:
+        assert b.label and b.label_hi and b.dot
+        assert b.color.startswith("#") and len(b.color) == 7
 
 
 def h(hour):

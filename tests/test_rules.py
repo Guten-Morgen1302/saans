@@ -157,6 +157,33 @@ def test_demo_school_loads_and_window_covers_timetable():
     assert {a.action for a in plan.actions} >= {"indoor", "windows_closed"}
 
 
+def test_spans_are_clamped_to_the_timetable():
+    s = load_school(ROOT / "school.yaml")                      # 08:00-13:50
+    plan = protocol(flat(300, hours=s.hour_window()), s, TUE, RULES)
+    assert plan.school_day == (time(8), time(13, 50))
+    windows = [a for a in plan.actions if a.rule_id == "windows-closed"][0]
+    grap = [a for a in plan.actions if a.action == "grap_advisory"][0]
+    assert (windows.start, windows.end) == (time(8), time(13, 50))
+    assert (grap.start, grap.end) == (time(8), time(13, 50))
+    assert plan.header == (time(8), time(13, 50), Band.SEVERE)
+    assert all(a.end <= time(13, 50) for a in plan.actions)
+
+
+def test_school_config_language_and_venue():
+    s = load_school(ROOT / "school.yaml")
+    assert s.primary_language == "hi"
+    assert s.venue("PE", "en") == "the hall" and s.venue("PE", "hi") == "हॉल"
+    assert s.venue("Yoga", "en") == "a classroom"
+
+
+def test_school_rejects_bad_language(tmp_path):
+    p = tmp_path / "school.yaml"
+    p.write_text("id: x\nname: X\nclasses: {3B: 1}\nweekdays: [0]\nprimary_language: fr\nday:\n"
+                 "  - {name: PE, who: 3B, start: '09:00', end: '09:40', outdoor: true}\n")
+    with pytest.raises(ValueError, match="primary_language"):
+        load_school(p)
+
+
 def test_school_rejects_unknown_class(tmp_path):
     p = tmp_path / "school.yaml"
     p.write_text("id: x\nname: X\nclasses: {3B: 1}\nweekdays: [0]\nday:\n"

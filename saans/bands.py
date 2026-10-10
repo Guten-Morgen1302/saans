@@ -26,6 +26,34 @@ class Band(IntEnum):
     def label(self) -> str:
         return self.name.replace("_", " ").title()
 
+    @property
+    def label_hi(self) -> str:
+        return _INFO[self][0]
+
+    @property
+    def color(self) -> str:
+        return _INFO[self][1]
+
+    @property
+    def dot(self) -> str:
+        return _INFO[self][2]
+
+    def name_in(self, lang: str) -> str:
+        return self.label_hi if lang == "hi" else self.label
+
+
+# One vocabulary for every message and the report (design 11A): CPCB Hindi
+# band names and CPCB bulletin colours. Colours are fills only, never text.
+_INFO = {
+    Band.GOOD: ("अच्छा", "#00B050", "🟢"),
+    Band.SATISFACTORY: ("संतोषजनक", "#92D050", "🟢"),
+    Band.MODERATE: ("मध्यम", "#FFFF00", "🟡"),
+    Band.POOR: ("खराब", "#FF9900", "🟠"),
+    Band.VERY_POOR: ("बहुत खराब", "#FF0000", "🔴"),
+    Band.SEVERE: ("गंभीर", "#C00000", "🟤"),
+}
+
+SAANS_BAND = {"en": "Saans air band", "hi": "साँस वायु श्रेणी"}
 
 _UPPER_BOUNDS = [(30, Band.GOOD), (60, Band.SATISFACTORY), (90, Band.MODERATE),
                  (120, Band.POOR), (250, Band.VERY_POOR)]

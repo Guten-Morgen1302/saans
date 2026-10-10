@@ -8,6 +8,10 @@
 
 Invalid moves (e.g. SKIPPED → APPROVED, EXPIRED → POSTING) are impossible
 because every transition is a conditional update from the expected state.
+
+Every final state is stamped on the principal's plan message and its buttons
+are removed (design 5A). Stamping is best-effort (eng R19): an edit failure is
+logged, never changes plan state, and a final stamp falls back to a new message.
 """
 
 from __future__ import annotations
@@ -15,9 +19,11 @@ from __future__ import annotations
 import logging
 import time as _time
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from typing import Callable, Protocol
 
+from saans import messages
+from saans.ingest import IST
 from saans.store import PlanStore
 
 log = logging.getLogger(__name__)
@@ -32,6 +38,7 @@ class MessengerError(RuntimeError):
 
 class Messenger(Protocol):
     def send(self, chat_id: int, text: str, buttons: list[tuple[str, str]] | None = None) -> int: ...
+    def edit(self, chat_id: int, message_id: int, text: str) -> None: ...
     def answer_callback(self, callback_id: str, text: str) -> None: ...
 
 
@@ -58,6 +65,7 @@ class Deps:
     messenger: Messenger
     settings: Settings
     sleep: Callable[[float], None] = field(default=_time.sleep)
+    now: Callable[[], datetime] = field(default=lambda: datetime.now(IST))
 
 
 def callback_data(action: str, target: date, mode: str) -> str:
@@ -74,10 +82,13 @@ def parse_callback(data: str) -> tuple[str, date, str]:
 def send_plan(deps: Deps, target: date, mode: str, texts: dict[str, str]) -> str:
     """Create (if needed) and send the plan to the principal. Idempotent per key.
 
-    texts: {"principal": ..., "parents": ..., "staff": ...}
+    texts: {"principal": ..., "parents": ..., "staff": ...} (Telegram HTML)
     """
     s, st = deps.settings, deps.store
     if mode == "replay":
+        old = st.get(s.school_id, target, mode)
+        if old and old.get("principal_msg_id"):
+            _stamp(deps, old, messages.stamp("replaced"), fallback=False)   # eng R18
         st.reset(s.school_id, target, mode, texts)
     elif not st.create(s.school_id, target, mode, texts):
         existing = st.get(s.school_id, target, mode)
@@ -89,20 +100,35 @@ def send_plan(deps: Deps, target: date, mode: str, texts: dict[str, str]) -> str
 
     msg_id = deps.messenger.send(
         s.principal_chat_id, texts["principal"],
-        buttons=[("Approve", callback_data("approve", target, mode)),
-                 ("Skip", callback_data("skip", target, mode))],
+        buttons=messages.buttons(callback_data("approve", target, mode),
+                                 callback_data("skip", target, mode)),
     )
     st.transition(s.school_id, target, mode, {"CREATED"}, "SENT", "sent",
                   extra={"principal_msg_id": msg_id})
     return "sent"
 
 
-def approve(deps: Deps, target: date, mode: str, by: int) -> str:
+def is_current(deps: Deps, target: date, mode: str, message_id) -> bool | None:
+    """Did this tap come from the plan's current message? None if no plan (eng R18)."""
+    plan = deps.store.get(deps.settings.school_id, target, mode)
+    if not plan:
+        return None
+    stored = plan.get("principal_msg_id")
+    return stored is not None and message_id is not None and int(stored) == int(message_id)
+
+
+def approve(deps: Deps, target: date, mode: str, by: int,
+            on_accepted: Callable[[], None] | None = None) -> str:
     s, st = deps.settings, deps.store
     if not st.transition(s.school_id, target, mode, {"SENT"}, "APPROVED", "approved", by=str(by)):
         return _explain(deps, target, mode)
+    if on_accepted:
+        on_accepted()                                     # design 6A: answer the tap first
+    approved_at = deps.now()
     st.transition(s.school_id, target, mode, {"APPROVED"}, "POSTING", "posting")
     plan = st.get(s.school_id, target, mode)
+    _stamp(deps, plan, messages.stamp("sending"), fallback=False)
+
     failed = []
     for channel, chat_id in s.channels(mode).items():
         st.set_delivery(s.school_id, target, mode, channel, "POSTING")
@@ -113,18 +139,21 @@ def approve(deps: Deps, target: date, mode: str, by: int) -> str:
             failed.append(channel)
     final = "FAILED" if failed else "POSTED"
     st.transition(s.school_id, target, mode, {"POSTING"}, final, final.lower())
-    if failed:
-        deps.messenger.send(s.principal_chat_id,
-                            f"Could not post the plan to: {', '.join(failed)}. Please share it manually.")
-        return "failed"
-    return "posted"
+
+    plan = st.get(s.school_id, target, mode)
+    _stamp(deps, plan, messages.stamp("approved", approved_at.time(), plan["delivery"]))
+    for channel in failed:
+        _send_quietly(deps, s.principal_chat_id,
+                      messages.render_forward(channel, plan["texts"][channel]))
+    return "failed" if failed else "posted"
 
 
 def skip(deps: Deps, target: date, mode: str, by: int) -> str:
     s = deps.settings
-    if deps.store.transition(s.school_id, target, mode, {"SENT"}, "SKIPPED", "skipped", by=str(by)):
-        return "skipped"
-    return _explain(deps, target, mode)
+    if not deps.store.transition(s.school_id, target, mode, {"SENT"}, "SKIPPED", "skipped", by=str(by)):
+        return _explain(deps, target, mode)
+    _stamp(deps, deps.store.get(s.school_id, target, mode), messages.stamp("skipped", deps.now().time()))
+    return "skipped"
 
 
 def remind(deps: Deps, today: date) -> str:
@@ -133,30 +162,49 @@ def remind(deps: Deps, today: date) -> str:
     plan = deps.store.get(s.school_id, today, "live")
     if not plan or plan["status"] != "SENT":
         return "nothing_to_remind"
-    deps.messenger.send(s.principal_chat_id,
-                        "Reminder: today's air plan is waiting for Approve or Skip. It expires at 07:00.")
+    deps.messenger.send(s.principal_chat_id, messages.render_reminder(today))
     return "reminded"
 
 
 def expire(deps: Deps, today: date) -> str:
     """07:00: a live plan nobody answered expires; nothing is sent to parents."""
     s = deps.settings
-    if deps.store.transition(s.school_id, today, "live", {"SENT"}, "EXPIRED", "expired"):
-        return "expired"
-    return "nothing_to_expire"
+    if not deps.store.transition(s.school_id, today, "live", {"SENT"}, "EXPIRED", "expired"):
+        return "nothing_to_expire"
+    _stamp(deps, deps.store.get(s.school_id, today, "live"), messages.stamp("expired"))
+    return "expired"
 
 
 def _explain(deps: Deps, target: date, mode: str) -> str:
     plan = deps.store.get(deps.settings.school_id, target, mode)
     status = plan["status"] if plan else None
     if status == "EXPIRED":
-        deps.messenger.send(deps.settings.principal_chat_id, "This plan expired at 07:00.")
         return "expired"
     if status == "SKIPPED":
         return "already_skipped"
     if status in DONE:
         return "already_done"
     return "not_found"
+
+
+def _stamp(deps: Deps, plan: dict, stamp_text: str, fallback: bool = True) -> None:
+    """Rewrite the principal's plan with an outcome stamp and no buttons (eng R19)."""
+    chat = deps.settings.principal_chat_id
+    try:
+        deps.messenger.edit(chat, int(plan["principal_msg_id"]),
+                            messages.with_stamp(plan["texts"]["principal"], stamp_text))
+        return
+    except (MessengerError, KeyError, TypeError) as e:
+        log.warning("stamp edit failed for plan %s: %s", plan.get("sk"), e)
+    if fallback:
+        _send_quietly(deps, chat, stamp_text)
+
+
+def _send_quietly(deps: Deps, chat_id: int, text: str) -> None:
+    try:
+        deps.messenger.send(chat_id, text)
+    except MessengerError as e:
+        log.error("could not send to %s: %s", chat_id, e)
 
 
 def _post_with_retries(deps: Deps, chat_id: int, text: str) -> bool:

@@ -1,0 +1,138 @@
+"""Every user-facing string, in English and Hindi (design 8A).
+
+Tone rules (design 10A): short sentences with times and actions; no "!",
+no "stay safe", no medical advice; the only emoji is the band dot, always next
+to the band name. Hindi is a draft until a native speaker checks it (DT7).
+
+Placeholders are filled by saans.messages after HTML-escaping every value.
+"""
+
+T = {
+    "en": {
+        "weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+        "date": "{wd} {d} {mon}",
+        "date_year": "{wd} {d} {mon} {y}",
+        "replay": "REPLAY · using data from the evening of {date}",
+        "header": "<b>{date} · {dot} {band} {start}-{end}</b>",
+        "header_plain": "<b>{date}</b>",
+        "band_note": "{saans_band} (our PM2.5 forecast, not the official AQI)",
+        # principal plan, grouped (design 1A)
+        "pe_cancel": "Cancelled, outdoor PE: {items}. No PE; classes stay in their rooms.",
+        "pe_indoor": "PE indoors: {items}.",
+        "pe_indoor_item": "{who} {time} in {venue} ({dot} {band})",
+        "assembly": "Assembly: in classrooms over the PA.",
+        "recess": "Recess: indoors, no outdoor play.",
+        "windows": "Windows: closed {start}-{end}.",
+        "grap": "Prepare: likely GRAP Stage III. Official order pending. "
+                "Keep the hybrid plan for Classes up to V ready.",
+        "preview_hi": "हिन्दी",
+        "preview_parents": "What parents will see",
+        "preview_staff": "What staff will see",
+        "btn_approve": "Approve & send",
+        "btn_skip": "Skip (send nothing)",
+        # parents (design 2A, eng R17): no class names, no GRAP
+        "parent_open": "<b>{date}:</b> school runs as usual unless the school announces a change.",
+        "parent_band": "Air is expected to be {dot} {band} ({saans_band}) during school hours.",
+        "parent_pe": "PE will not be held outdoors.",
+        "parent_assembly": "Assembly will be held in classrooms.",
+        "parent_recess": "Recess will be indoors.",
+        "parent_windows": "Classroom windows will stay closed {start}-{end}.",
+        "parent_note": "{saans_band} is the school's PM2.5 forecast, not the official AQI.",
+        # staff (design 3A)
+        "staff_whole": "Whole school: {items}",
+        "staff_assembly": "assembly in classrooms over the PA",
+        "staff_recess": "recess indoors, no outdoor play",
+        "staff_windows": "windows closed {start}-{end}",
+        "staff_class": "{who}: {items}",
+        "staff_pe_cancel": "{time} PE, no PE (stay in room)",
+        "staff_pe_indoor": "{time} PE in {venue}",
+        # system states (design 8A)
+        "no_action": "{date}: no changes needed. School hours {dot} {band}; "
+                     "worst {wdot} {wband} at {hour}. Nothing will be sent.",
+        "unavailable": "{date}: no plan tonight. Air data didn't arrive in time. "
+                       "Check the official SAMEER app in the morning.",
+        "reminder": "Reminder: today's air plan ({date}) is waiting. It expires at 07:00.",
+        "stamp_sending": "Sending…",
+        "stamp_approved": "Approved {time} · Parents: {parents} · Staff: {staff}",
+        "stamp_skipped": "Skipped {time}, nothing sent",
+        "stamp_expired": "Expired 07:00, nothing sent",
+        "stamp_replaced": "Replaced by a newer replay",
+        "sent": "sent",
+        "not_sent": "could not post",
+        "forward": "Could not post to the {audience}. Please forward the text below.",
+        "aud_parents": "parents' channel",
+        "aud_staff": "staff group",
+        "not_registered": "Sorry, this bot only works for registered school staff.",
+        "help": "You'll get the air plan here at 18:00 on the evening before each school day.",
+        # button toasts (short; Telegram shows them briefly)
+        "toast_sending": "Sending to parents and staff…",
+        "toast_skipped": "Skipped. Nothing was sent.",
+        "toast_expired": "This plan expired at 07:00.",
+        "toast_done": "Already done. See the note on the plan.",
+        "toast_replaced": "This plan was replaced.",
+        "toast_unknown": "Unknown button.",
+        "toast_gone": "This plan no longer exists.",
+    },
+    "hi": {
+        "weekdays": ["सोम", "मंगल", "बुध", "गुरु", "शुक्र", "शनि", "रवि"],
+        "months": ["जनवरी", "फ़रवरी", "मार्च", "अप्रैल", "मई", "जून",
+                   "जुलाई", "अगस्त", "सितंबर", "अक्टूबर", "नवंबर", "दिसंबर"],
+        "date": "{wd} {d} {mon}",
+        "date_year": "{wd} {d} {mon} {y}",
+        "replay": "रीप्ले · {date} की शाम के डेटा से",
+        "header": "<b>{date} · {dot} {band} {start}-{end}</b>",
+        "header_plain": "<b>{date}</b>",
+        "band_note": "{saans_band} (हमारा PM2.5 पूर्वानुमान, आधिकारिक AQI नहीं)",
+        "pe_cancel": "रद्द, बाहर का PE: {items}. PE नहीं होगा; कक्षाएँ अपने कमरों में रहेंगी।",
+        "pe_indoor": "PE अंदर: {items}.",
+        "pe_indoor_item": "{who} {time} {venue} में ({dot} {band})",
+        "assembly": "प्रार्थना सभा: कक्षाओं में, PA से।",
+        "recess": "अवकाश: अंदर, बाहर खेलना नहीं।",
+        "windows": "खिड़कियाँ: {start}-{end} बंद रहेंगी।",
+        "grap": "तैयारी: GRAP स्टेज III की संभावना। आधिकारिक आदेश अभी नहीं आया है। "
+                "कक्षा V तक की हाइब्रिड योजना तैयार रखें।",
+        "parent_open": "<b>{date}:</b> स्कूल सामान्य रूप से चलेगा, जब तक स्कूल कोई बदलाव घोषित न करे।",
+        "parent_band": "स्कूल के समय हवा {dot} {band} ({saans_band}) रहने की संभावना है।",
+        "parent_pe": "बाहर PE नहीं होगा।",
+        "parent_assembly": "प्रार्थना सभा कक्षाओं में होगी।",
+        "parent_recess": "अवकाश अंदर होगा।",
+        "parent_windows": "कक्षाओं की खिड़कियाँ {start}-{end} बंद रहेंगी।",
+        "parent_note": "{saans_band} स्कूल का PM2.5 पूर्वानुमान है, आधिकारिक AQI नहीं।",
+        "staff_whole": "पूरा स्कूल: {items}",
+        "staff_assembly": "प्रार्थना सभा कक्षाओं में, PA से",
+        "staff_recess": "अवकाश अंदर, बाहर खेलना नहीं",
+        "staff_windows": "खिड़कियाँ {start}-{end} बंद",
+        "staff_class": "{who}: {items}",
+        "staff_pe_cancel": "{time} PE, PE नहीं (कमरे में रहें)",
+        "staff_pe_indoor": "{time} PE {venue} में",
+        "no_action": "{date}: कोई बदलाव ज़रूरी नहीं। स्कूल समय {dot} {band}; "
+                     "सबसे खराब {wdot} {wband} {hour} पर। कुछ नहीं भेजा जाएगा।",
+        "unavailable": "{date}: आज रात कोई योजना नहीं। हवा का डेटा समय पर नहीं आया। "
+                       "सुबह आधिकारिक SAMEER ऐप देखें।",
+        "reminder": "याद दिलाना: आज की वायु योजना ({date}) इंतज़ार कर रही है। यह 07:00 पर समाप्त होगी।",
+        "stamp_sending": "भेजा जा रहा है…",
+        "stamp_approved": "मंज़ूर {time} · अभिभावक: {parents} · स्टाफ़: {staff}",
+        "stamp_skipped": "छोड़ा गया {time}, कुछ नहीं भेजा",
+        "stamp_expired": "07:00 पर समाप्त, कुछ नहीं भेजा",
+        "stamp_replaced": "नए रीप्ले से बदला गया",
+        "sent": "भेजा गया",
+        "not_sent": "नहीं भेजा जा सका",
+        "forward": "{audience} में नहीं भेजा जा सका। कृपया नीचे का संदेश फ़ॉरवर्ड करें।",
+        "aud_parents": "अभिभावक चैनल",
+        "aud_staff": "स्टाफ़ ग्रुप",
+        "not_registered": "माफ़ करें, यह बॉट केवल पंजीकृत स्कूल स्टाफ़ के लिए है।",
+        "help": "हर स्कूल दिवस से पहले की शाम 18:00 बजे आपको यहाँ वायु योजना मिलेगी।",
+        "toast_sending": "अभिभावकों और स्टाफ़ को भेजा जा रहा है…",
+        "toast_skipped": "छोड़ा गया। कुछ नहीं भेजा।",
+        "toast_expired": "यह योजना 07:00 पर समाप्त हो गई।",
+        "toast_done": "पहले ही हो चुका है। योजना पर नोट देखें।",
+        "toast_replaced": "यह योजना बदल दी गई है।",
+        "toast_unknown": "अज्ञात बटन।",
+        "toast_gone": "यह योजना अब मौजूद नहीं है।",
+    },
+}
+
+# Design 10A lint: none of these may appear in any rendered message.
+BANNED = ["stay safe", "don't worry", "unlock", "!", "tomorrow", "School is open"]

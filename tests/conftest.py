@@ -19,8 +19,11 @@ SETTINGS = Settings(
 class FakeMessenger:
     def __init__(self):
         self.sent = []          # (chat_id, text, buttons)
+        self.edits = []         # (chat_id, message_id, text)
         self.answers = []       # (callback_id, text)
+        self.events = []        # ordered log: ("send", chat) / ("answer", text) / ("edit", id)
         self.fail_chats = {}    # chat_id -> number of failures before success
+        self.fail_edits = 0     # number of edits to fail ("message is not modified" etc.)
         self._next = 1
 
     def send(self, chat_id, text, buttons=None):
@@ -28,11 +31,20 @@ class FakeMessenger:
             self.fail_chats[chat_id] -= 1
             raise MessengerError(f"telegram error for {chat_id}")
         self.sent.append((chat_id, text, buttons))
+        self.events.append(("send", chat_id))
         self._next += 1
         return self._next
 
+    def edit(self, chat_id, message_id, text):
+        if self.fail_edits > 0:
+            self.fail_edits -= 1
+            raise MessengerError("Bad Request: message is not modified")
+        self.edits.append((chat_id, message_id, text))
+        self.events.append(("edit", message_id))
+
     def answer_callback(self, callback_id, text):
         self.answers.append((callback_id, text))
+        self.events.append(("answer", text))
 
     def to(self, chat_id):
         return [t for c, t, _ in self.sent if c == chat_id]

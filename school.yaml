@@ -10,6 +10,10 @@ classes:            # class -> number of students with asthma
   7B: 2
   9A: 1
 
+primary_language: hi     # parent/staff posts show this language first (design 17A)
+indoor_venue:            # where "indoors" happens, per activity (design 15A)
+  PE: {en: "the hall", hi: "हॉल"}
+
 # Same timetable Monday-Saturday for the demo; weekdays: 0=Mon .. 5=Sat.
 weekdays: [0, 1, 2, 3, 4, 5]
 day:

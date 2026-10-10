@@ -10,6 +10,8 @@ On the evening of 10 Nov 2025, using only data published by 16:00, Saans would h
 
 ## How it works
 
+Animated diagram: `docs/architecture.html`. Press A to switch between the local run and the AWS mapping.
+
 ```
 CPCB stations (OpenAQ) ─▶ forecast (persistence, as of 18:00) ─▶ rules.yaml ─▶ Telegram plan
                                                                                │ Approve & send

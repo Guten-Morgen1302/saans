@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saans · how it works</title>
+<style>
+@font-face { font-family: PlexSerif; src: url(fonts/IBMPlexSerif-Regular.woff2) format("woff2"); }
+@font-face { font-family: Plex; font-weight: 600; src: url(fonts/IBMPlexSans-SemiBold.woff2) format("woff2"); }
+@font-face { font-family: PlexMono; src: url(fonts/IBMPlexMono-Regular.woff2) format("woff2"); }
+:root {
+  --ink: #1d1d1b; --muted: #555550; --own: #0e4a3a; --line: #6b6b66;
+  --green: #0f5a45; --orange: #f07a52;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: linear-gradient(180deg, #74746f 0%, #a9a9a2 18%, #dcdbd1 42%, #eeede4 70%, #f3f2ea 100%);
+  color: var(--ink); overflow: hidden; font-family: Plex, sans-serif;
+}
+svg { width: 100vw; height: 100vh; display: block; }
+.kicker { font: 600 15px PlexMono, monospace; letter-spacing: 4px; fill: #2e2e2b; }
+.title { font: 44px PlexSerif, serif; fill: #1d1d1b; }
+.name { font: 600 22px Plex, sans-serif; fill: var(--ink); }
+.name.own { fill: var(--own); }
+.sub { font: 17px PlexMono, monospace; fill: var(--muted); }
+.edge { fill: none; stroke: var(--line); stroke-width: 1.3; opacity: 0.75; }
+.edge.dashed { stroke-dasharray: 6 6; }
+.face { stroke: #4a4a46; stroke-width: 1; stroke-opacity: 0.55; }
+.note { font: 15px PlexMono, monospace; fill: #3f3f3b; }
+.badge { font: 600 14px PlexMono, monospace; letter-spacing: 2px; }
+.aws-only { opacity: 0; transition: opacity .6s; }
+body.aws .aws-only { opacity: 1; }
+.swap { transition: opacity .35s; }
+</style>
+</head>
+<body>
+<svg id="stage" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet" role="img"
+     aria-label="Saans architecture: CPCB data and backup sensors feed an 18:00 forecast; fixed rules turn it into a plan; a Strands agent writes a checked summary; the Telegram bot sends the plan to the principal, stores state, and on approval posts to parents and staff.">
+  <text class="kicker" x="40" y="62" data-local="HOW SAANS WORKS, END TO END" data-aws="THE SAME CODE ON AWS · READY TO DEPLOY (template.yaml)">HOW SAANS WORKS, END TO END</text>
+  <text class="title" x="40" y="118" data-local="Every box is real code in the repo" data-aws="Every box maps to a service in template.yaml">Every box is real code in the repo</text>
+  <g id="edges"></g>
+  <g id="dots"></g>
+  <g id="nodes"></g>
+  <text class="badge" id="badge" x="1560" y="62" text-anchor="end" fill="#1d1d1b">● RUNNING NOW · LOCAL</text>
+  <text class="note" x="40" y="872" id="foot"
+        data-local="Runs tonight: Telegram long polling · DynamoDB Local · Strands Agents SDK + Gemini · 220 tests.   Press A for the AWS view."
+        data-aws="template.yaml: 2 Lambdas · EventBridge 18:00/06:30/07:00 IST · DynamoDB · SSM secrets · CloudWatch alarm → SNS.   Press A: local view.">Runs tonight: Telegram long polling · DynamoDB Local · Strands Agents SDK + Gemini · 220 tests.   Press A for the AWS view.</text>
+</svg>
+<script>
+// kind: data (peach) | infra (grey) | ai (lavender) | people (lavender)
+const NODES = [
+  {id: "cpcb", x: 190, y: 330, kind: "data", own: false,
+   local: ["CPCB stations", "6 in Delhi · via OpenAQ"], aws: ["CPCB stations", "via OpenAQ API"]},
+  {id: "backup", x: 190, y: 600, kind: "data", own: false,
+   local: ["Backup sensors", "3 AirGradient · corrected"], aws: ["Backup sensors", "if CPCB > 6 h stale"]},
+  {id: "clock", x: 470, y: 215, kind: "infra", own: true,
+   local: ["Clock", "18:00 · 06:30 · 07:00"], aws: ["EventBridge", "3 crons, IST"]},
+  {id: "forecast", x: 470, y: 455, kind: "infra", own: true,
+   local: ["Forecast", "as of 16:00 · persistence"], aws: ["Lambda", "scheduled · forecast"]},
+  {id: "cloudwatch", x: 470, y: 715, kind: "infra", own: false, awsOnly: true,
+   local: ["CloudWatch", "missed-night alarm"], aws: ["CloudWatch → SNS", "missed night · errors"]},
+  {id: "rules", x: 750, y: 455, kind: "infra", own: true,
+   local: ["Rules", "rules.yaml · 6 sourced"], aws: ["Rules", "rules.yaml · 6 sourced"]},
+  {id: "agent", x: 750, y: 715, kind: "ai", own: true,
+   local: ["Strands agent", "Gemini · 1-line summary"], aws: ["Strands agent", "Bedrock · 1-line summary"]},
+  {id: "validator", x: 1010, y: 715, kind: "infra", own: true,
+   local: ["Validator", "drops any new fact"], aws: ["Validator", "drops any new fact"]},
+  {id: "bot", x: 1030, y: 455, kind: "infra", own: true,
+   local: ["Telegram bot", "@SaansSchoolBot"], aws: ["Lambda", "webhook · Function URL"]},
+  {id: "db", x: 1030, y: 215, kind: "infra", own: true,
+   local: ["DynamoDB", "plan state · stamps"], aws: ["DynamoDB", "plan state · SSM secrets"]},
+  {id: "principal", x: 1310, y: 250, kind: "people", own: false,
+   local: ["Principal", "phone, 18:00"], aws: ["Principal", "phone, 18:00"]},
+  {id: "parents", x: 1450, y: 500, kind: "people", own: false,
+   local: ["Parents", "Hindi-first notice"], aws: ["Parents", "Hindi-first notice"]},
+  {id: "staff", x: 1300, y: 730, kind: "people", own: false,
+   local: ["Staff", "one line per class"], aws: ["Staff", "one line per class"]},
+];
+// [from, to, dots, colour, options]
+const EDGES = [
+  ["cpcb", "forecast", 2, "green"],
+  ["backup", "forecast", 1, "orange", {dashed: true}],
+  ["clock", "forecast", 1, "orange"],
+  ["forecast", "rules", 2, "green"],
+  ["forecast", "cloudwatch", 1, "orange", {awsOnly: true}],
+  ["rules", "bot", 2, "green"],
+  ["rules", "agent", 1, "orange"],
+  ["agent", "validator", 1, "orange"],
+  ["validator", "bot", 1, "green"],
+  ["bot", "db", 2, "green", {both: true}],
+  ["bot", "principal", 2, "green"],
+  ["bot", "principal", 1, "orange", {curve: 40, label: "Approve", reverse: true}],
+  ["bot", "parents", 1, "green"],
+  ["bot", "staff", 1, "green"],
+];
+const PAL = {
+  data:   ["#dcbcaa", "#caa594", "#b68f7e"],
+  infra:  ["#d9d9d4", "#c4c4bf", "#afafa9"],
+  ai:     ["#cfc2e2", "#baaad4", "#a693c4"],
+  people: ["#d3c7e6", "#bdaed8", "#a998c9"],
+};
+const W = 54, D = 27, H = 62;          // cube half-width, half-depth, height
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs, parent) => {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+};
+const byId = Object.fromEntries(NODES.map(n => [n.id, n]));
+const center = n => [n.x, n.y - H / 2];
+// Same stops as the body gradient, so label halos blend into the background.
+const STOPS = [[0, [0x74, 0x74, 0x6f]], [.18, [0xa9, 0xa9, 0xa2]], [.42, [0xdc, 0xdb, 0xd1]],
+               [.70, [0xee, 0xed, 0xe4]], [1, [0xf3, 0xf2, 0xea]]];
+function bgAt(y) {
+  const f = Math.min(Math.max(y / 900, 0), 1);
+  for (let i = 1; i < STOPS.length; i++) {
+    const [f0, c0] = STOPS[i - 1], [f1, c1] = STOPS[i];
+    if (f <= f1) {
+      const k = (f - f0) / (f1 - f0);
+      return "rgb(" + c0.map((v, j) => Math.round(v + (c1[j] - v) * k)).join(",") + ")";
+    }
+  }
+  return "rgb(243,242,234)";
+}
+
+function cube(n) {
+  const g = el("g", {class: n.awsOnly ? "aws-only" : ""}, document.getElementById("nodes"));
+  const {x, y} = n, [top, left, right] = PAL[n.kind];
+  const poly = (pts, fill) => el("polygon", {points: pts.map(p => p.join(",")).join(" "), fill, class: "face"}, g);
+  poly([[x, y - H - D], [x + W, y - H], [x, y - H + D], [x - W, y - H]], top);
+  poly([[x - W, y - H], [x, y - H + D], [x, y + D], [x - W, y]], left);
+  poly([[x, y - H + D], [x + W, y - H], [x + W, y], [x, y + D]], right);
+  // A background plate behind the labels, so edges and dots never cut through text.
+  n.plate = el("rect", {fill: bgAt(y + D + 50), rx: 4}, g);
+  const name = el("text", {x, y: y + D + 36, "text-anchor": "middle", class: "name swap" + (n.own ? " own" : "")}, g);
+  const sub = el("text", {x, y: y + D + 62, "text-anchor": "middle", class: "sub swap"}, g);
+  name.textContent = n.local[0]; sub.textContent = n.local[1];
+  n.els = [name, sub];
+  fitPlate(n);
+}
+
+function fitPlate(n) {
+  const boxes = n.els.map(e => e.getBBox());
+  const x0 = Math.min(...boxes.map(b => b.x)) - 8, x1 = Math.max(...boxes.map(b => b.x + b.width)) + 8;
+  const y0 = Math.min(...boxes.map(b => b.y)) - 4, y1 = Math.max(...boxes.map(b => b.y + b.height)) + 4;
+  Object.entries({x: x0, y: y0, width: x1 - x0, height: y1 - y0})
+    .forEach(([k, v]) => n.plate.setAttribute(k, v));
+}
+
+function edges() {
+  const eg = document.getElementById("edges"), dg = document.getElementById("dots");
+  EDGES.forEach(([a, b, count, colour, opt = {}], i) => {
+    const [x1, y1] = center(byId[a]), [x2, y2] = center(byId[b]);
+    let d = `M${x1},${y1} L${x2},${y2}`;
+    if (opt.curve) {
+      const mx = (x1 + x2) / 2 + opt.curve, my = (y1 + y2) / 2 + opt.curve;
+      d = `M${x1},${y1} Q${mx},${my} ${x2},${y2}`;
+    }
+    const id = "p" + i;
+    const wrap = opt.awsOnly ? "aws-only" : "";
+    el("path", {id, d, class: "edge" + (opt.dashed ? " dashed" : "") + (wrap ? " " + wrap : "")}, eg);
+    if (opt.label) {
+      const t = el("text", {class: "sub", "font-size": 15}, eg);
+      const tp = el("textPath", {href: "#" + id, startOffset: "50%", "text-anchor": "middle"}, t);
+      tp.textContent = opt.label;
+    }
+    const dur = 3.2 + (i % 4) * 0.45;
+    for (let k = 0; k < count; k++) {
+      const add = reverse => {
+        const c = el("circle", {r: 7.5, fill: colour === "green" ? "var(--green)" : "var(--orange)",
+                                class: wrap}, dg);
+        const m = el("animateMotion", {dur: dur + "s", repeatCount: "indefinite",
+                                       begin: (-(dur / count) * k - i * 0.37) + "s",
+                                       ...(reverse ? {keyPoints: "1;0", keyTimes: "0;1", calcMode: "linear"} : {})}, c);
+        el("mpath", {href: "#" + id}, m);
+      };
+      add(!!opt.reverse);
+      if (opt.both && k === 0) add(true);
+    }
+  });
+}
+
+edges();
+NODES.forEach(cube);
+
+let aws = false;
+function apply() {
+  NODES.forEach(n => {
+    const [name, sub] = aws ? n.aws : n.local;
+    n.els[0].textContent = name; n.els[1].textContent = sub;
+    fitPlate(n);
+  });
+  document.querySelectorAll("[data-local]").forEach(t => t.textContent = t.dataset[aws ? "aws" : "local"]);
+  document.getElementById("badge").textContent =
+    aws ? "◇ READY TO DEPLOY · NOT DEPLOYED" : "● RUNNING NOW · LOCAL";
+}
+function toggle(animate = true) {
+  aws = !aws;
+  document.body.classList.toggle("aws", aws);
+  if (!animate) return apply();
+  document.querySelectorAll(".swap").forEach(t => t.style.opacity = 0);
+  setTimeout(() => {
+    apply();
+    document.querySelectorAll(".swap").forEach(t => t.style.opacity = 1);
+  }, 350);
+}
+addEventListener("keydown", e => { if (e.key === "a" || e.key === "A") toggle(); });
+if (location.hash === "#aws") toggle(false);
+document.fonts && document.fonts.ready.then(() => NODES.forEach(fitPlate));
+addEventListener("click", () => toggle());
+</script>
+</body>
+</html>

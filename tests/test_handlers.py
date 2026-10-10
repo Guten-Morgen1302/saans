@@ -30,6 +30,7 @@ def test_nightly_with_openaq_down_says_no_plan_and_still_beats(deps):
     assert out["outcome"] == "unavailable"
     assert metrics == ["unavailable"]
     assert deps.messenger.to(999)[-1].startswith("18:00 run: unavailable")
+    assert deps.messenger.to(999)[-1].endswith("no data received")
     assert "no plan tonight" in deps.messenger.to(SETTINGS.principal_chat_id)[0]
 
 

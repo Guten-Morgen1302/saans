@@ -1,18 +1,23 @@
 # Official school-relevant orders, used to mark the replay and report (eng review D3).
-# time_ist is null until the exact publication time is confirmed (design doc open question).
+# Exact issue times are not published. `not_before` is the reading that triggered the
+# order; `reported_by` is the earliest dated report found. Lead time is measured to
+# `not_before`, the most conservative (shortest) value.
 orders:
   - date: 2025-11-11
-    time_ist: null
+    not_before: "09:00"          # Delhi AQI read 425 at 09:00 (PIB release)
+    reported_by: "11:58"         # Careers360 report timestamp
     stage: GRAP Stage III
-    action: CAQM invokes Stage III in Delhi-NCR (AQI 425 that morning)
-    source: https://www.businesstoday.in/india/story/grap-3-restrictions-in-delhi-schools-directed-to-hold-classes-in-hybrid-mode-for-children-upto-class-5-501666-2025-11-11
+    action: CAQM invokes Stage III in Delhi-NCR (order CAQM-1444-DT dated 11.11.2025)
+    source: https://www.pib.gov.in/PressReleasePage.aspx?PRID=2188873&reg=48&lang=2
   - date: 2025-11-11
-    time_ist: null
+    not_before: "09:00"
+    reported_by: "11:58"
     stage: DoE circular
     action: Delhi schools hybrid up to Class V (DE.23(28)/Sch.Br./2025/1004)
     source: https://www.edudel.nic.in/upload/upload_2025_26/1004_dt_11112025.pdf
   - date: 2025-12-14
-    time_ist: null
+    not_before: null
+    reported_by: null
     stage: CAQM direction
     action: Outdoor school sports suspended across NCR (re-issued)
     source: https://www.businesstoday.in/india/story/amid-toxic-air-caqm-orders-halt-on-school-sports-in-delhi-ncr-warns-of-health-dangers-506590-2025-12-14

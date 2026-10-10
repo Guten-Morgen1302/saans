@@ -110,8 +110,9 @@ def run_scheduled(event: dict, rt: Runtime) -> dict:
     outcome = pipeline.run_evening(rt.deps, rt.ctx, series, made_at, "live")
     secs = (datetime.now(IST) - start).total_seconds()
     rt.metrics(outcome)
+    latest = f"latest data {max(series):%d %b %H:%M}" if series else "no data received"
     try:
-        rt.deps.messenger.send(rt.cfg.admin_chat_id, f"18:00 run: {outcome}, {secs:.1f}s")
+        rt.deps.messenger.send(rt.cfg.admin_chat_id, f"18:00 run: {outcome}, {secs:.1f}s, {latest}")
     except lifecycle.MessengerError as e:
         log.error("heartbeat message failed: %s", e)
     log.info("nightly run for %s: %s in %.1fs", made_at.date(), outcome, secs)

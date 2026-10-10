@@ -4,6 +4,10 @@ Evening-before air plans for Delhi schools. At 18:00 IST on the evening before e
 
 On the evening of 10 Nov 2025, using only data published by 16:00, Saans would have forecast a Severe school day for 11 Nov. GRAP Stage III and the Delhi DoE hybrid-classes order came the next morning.
 
+## Proof page
+
+`docs/index.html` is a self-contained page with the Nov 2025 replay chart, the message the principal got, backtest scores, and rule sources. Regenerate it with `python backtest/report.py`. It's served by GitHub Pages at https://guten-morgen1302.github.io/saans/ once Pages is enabled (Settings → Pages → main / docs).
+
 ## How it works
 
 ```

@@ -1,7 +1,17 @@
 # Delhi school calendar for the live nightly gate in 2026 (merged with 2025).
 # Mon-Sat are school days except the holidays below.
-# TODO(before Oct 5 2026): add the DoE 2026 gazetted list for Oct-Dec (Dussehra,
-# Diwali, Guru Nanak, Christmas). Only the fixed-date holiday is known for sure.
+# Gazetted holidays for Oct-Dec 2026 from the Delhi / DoPT lists as reproduced by
+#   https://cleartax.in/s/delhi-government-holiday-list-2026
+#   https://www.greythr.com/wiki/acts/st-delhi/holidays/2026/
+# The DoE's own page (edudel.nic.in/edu/HolidaysduringtheYear2026.html) could not be
+# fetched on 2026-09-27; verify against it.
+# NOT included (unconfirmed): a DoE autumn break of 17-19 Oct 2026 reported by one site.
+# If confirmed, add 2026-10-17 and 2026-10-19 (Oct 18 is a Sunday).
 school_weekdays: [0, 1, 2, 3, 4, 5]
 holidays:
   2026-10-02: Gandhi Jayanti
+  2026-10-20: Dussehra
+  2026-10-26: Maharishi Valmiki Jayanti (Delhi list)
+  2026-11-08: Diwali (Sunday)
+  2026-11-24: Guru Nanak Jayanti
+  2026-12-25: Christmas

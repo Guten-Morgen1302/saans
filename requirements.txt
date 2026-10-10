@@ -1,2 +1,3 @@
 requests>=2.32
 pyyaml>=6.0
+strands-agents>=1.57,<2   # pinned major: Lambda packaging pitfalls (sdk-python #1467)

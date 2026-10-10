@@ -1,0 +1,60 @@
+# Summary validator eval (eng R13 [->EVAL], R9). Each case is a plausible LLM
+# reply for the Nov 11-style plan in tests/test_summary.py (Severe morning,
+# PE 3B/7B/9A/5A cancelled, 3B 13:10 PE indoors at Very Poor, windows 08:00-13:50).
+# ok: true  = must be shown;  ok: false = must be rejected (reason substring).
+cases:
+  - text: "A Severe morning: all outdoor activity is cancelled and windows stay closed."
+    ok: true
+  - text: "Air is Severe through the morning. Keep everyone indoors and windows shut."
+    ok: true
+  - text: "Only the 13:10 PE for 3B happens indoors; everything else outdoors is cancelled."
+    ok: true
+  - text: "Windows stay closed from 08:00 to 13:50 while the air is Very Poor to Severe."
+    ok: true
+  - text: "Outdoor PE is cancelled for 3B, 7B, 9A and 5A."
+    ok: true
+  - text: "PM2.5 will reach 320 in the morning, so cancel outdoor play."
+    ok: false
+    reason: number
+  - text: "Air will be Moderate after lunch, so outdoor games can resume."
+    ok: false
+    reason: bands not in plan
+  - text: "Cancel PE for 6C at 10:30."
+    ok: false
+    reason: classes not in plan
+  - text: "Move the 11:15 assembly indoors."
+    ok: false
+    reason: times not in plan
+  - text: "GRAP Stage III is likely, so switch to hybrid classes."
+    ok: false
+    reason: banned word
+  - text: "The official order says schools must close."
+    ok: false
+    reason: banned word
+  - text: "Everything will be fine if children stay indoors."
+    ok: false
+    reason: banned word
+  - text: "It is safe to hold PE indoors in the hall."
+    ok: false
+    reason: banned word
+  - text: "Air is Severe! Cancel everything outdoors."
+    ok: false
+    reason: tone
+  - text: "Stay safe: outdoor activity is cancelled."
+    ok: false
+    reason: banned word
+  - text: "School hours are Severe. PE is cancelled. Recess is indoors."
+    ok: false
+    reason: more than 2 sentences
+  - text: "Tomorrow the air is Severe, so outdoor activity is cancelled."
+    ok: false
+    reason: tone
+  - text: ""
+    ok: false
+    reason: empty
+  - text: "Air quality is Good in the afternoon; the day is otherwise Severe."
+    ok: false
+    reason: bands not in plan
+  - text: "Expect roughly 2 hours of the worst air before recess."
+    ok: false
+    reason: number

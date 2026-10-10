@@ -40,6 +40,21 @@ class Runtime:
     sensor_ids: list[int]
     metrics: Callable[[str], None]
     now: Callable[[], datetime] = lambda: datetime.now(IST)
+    backup: pipeline.Backup | None = None
+
+
+def load_stations(path: Path = ROOT / "config" / "stations.yaml") -> tuple[list[int], pipeline.Backup | None]:
+    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    ids = [int(s["sensor_id"]) for s in raw["stations"]]
+    fb = raw.get("fallback")
+    if not fb:
+        return ids, None
+    from datetime import timedelta
+    return ids, pipeline.Backup(
+        sensors={int(s["sensor_id"]): float(s["divide_by"]) for s in fb["sensors"]},
+        stale_after=timedelta(hours=float(fb.get("stale_after_hours", 6))),
+        min_stations=int(fb.get("min_stations", 1)),
+    )
 
 
 def _build_runtime() -> Runtime:
@@ -57,7 +72,7 @@ def _build_runtime() -> Runtime:
         rules=load_rules(ROOT / "rules.yaml")[0],
         model_call=model_call_from_env(),
     )
-    stations = yaml.safe_load((ROOT / "config" / "stations.yaml").read_text(encoding="utf-8"))
+    sensor_ids, backup = load_stations()
     deps = Deps(store=PlanStore(boto3.resource("dynamodb").Table(cfg.table_name)),
                 messenger=TelegramMessenger(cfg.bot_token), settings=cfg.settings)
     cloudwatch = boto3.client("cloudwatch")
@@ -69,7 +84,7 @@ def _build_runtime() -> Runtime:
              "Dimensions": [{"Name": "outcome", "Value": outcome}]},
         ])
 
-    return Runtime(cfg, deps, ctx, [int(s["sensor_id"]) for s in stations["stations"]], metrics)
+    return Runtime(cfg, deps, ctx, sensor_ids, metrics, backup=backup)
 
 
 def _rt() -> Runtime:
@@ -103,14 +118,17 @@ def run_scheduled(event: dict, rt: Runtime) -> dict:
     made_at = pipeline.evening_made_at(now)
     start = datetime.now(IST)
     try:
-        series = pipeline.live_series(OpenAQClient(rt.cfg.openaq_key), rt.sensor_ids, made_at)
+        data = pipeline.live_data(OpenAQClient(rt.cfg.openaq_key), rt.sensor_ids, made_at, rt.backup)
     except OpenAQError as e:
         log.error("openaq fetch failed: %s", e)
-        series = {}                       # forecast → Unavailable → "no plan tonight" message
-    outcome = pipeline.run_evening(rt.deps, rt.ctx, series, made_at, "live")
+        data = pipeline.LiveData({}, "none", None)   # → Unavailable → "no plan tonight"
+    outcome = pipeline.run_evening(rt.deps, rt.ctx, data.series, made_at, "live",
+                                   backup_data=data.source == "backup",
+                                   min_stations=data.min_stations)
     secs = (datetime.now(IST) - start).total_seconds()
     rt.metrics(outcome)
-    latest = f"latest data {max(series):%d %b %H:%M}" if series else "no data received"
+    latest = (f"{data.source} data to {data.latest:%d %b %H:%M}" if data.latest
+              else "no data received")
     try:
         rt.deps.messenger.send(rt.cfg.admin_chat_id, f"18:00 run: {outcome}, {secs:.1f}s, {latest}")
     except lifecycle.MessengerError as e:

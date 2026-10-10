@@ -71,7 +71,8 @@ def _split(plan: Plan):
     return pe_cancel, pe_indoor, assembly, recess, windows, grap
 
 
-def _principal_block(plan: Plan, school: School, lang: str, replay_of, summary) -> str:
+def _principal_block(plan: Plan, school: School, lang: str, replay_of, summary,
+                     backup_data: bool = False) -> str:
     pe_cancel, pe_indoor, assembly, recess, windows, grap = _split(plan)
     lines = _replay_line(lang, replay_of) + [
         _header(plan, lang),
@@ -98,6 +99,8 @@ def _principal_block(plan: Plan, school: School, lang: str, replay_of, summary) 
         lines += ["", T[lang]["grap"]]
     if summary and lang == "en":
         lines += ["", f"<i>{_e(summary)}</i>"]
+    if backup_data:
+        lines += ["", f"<i>{T[lang]['data_backup']}</i>"]
     return "\n".join(lines)
 
 
@@ -155,7 +158,7 @@ def _expandable(title: str, body: str) -> str:
 
 
 def render_plan(plan: Plan, school: School, replay_of: date | None = None,
-                summary: str | None = None) -> dict[str, str]:
+                summary: str | None = None, backup_data: bool = False) -> dict[str, str]:
     """Texts for an actionable plan: {'principal', 'parents', 'staff'}."""
     if plan.no_action:
         raise ValueError("no-action plans are rendered with render_no_action")
@@ -165,9 +168,10 @@ def render_plan(plan: Plan, school: School, replay_of: date | None = None,
     parents = _fit_bilingual(parents_parts)
     staff = _fit_bilingual(staff_parts)
 
-    main = _principal_block(plan, school, "en", replay_of, summary)
+    main = _principal_block(plan, school, "en", replay_of, summary, backup_data)
     extras = [
-        _expandable(T["en"]["preview_hi"], _principal_block(plan, school, "hi", replay_of, None)),
+        _expandable(T["en"]["preview_hi"],
+                    _principal_block(plan, school, "hi", replay_of, None, backup_data)),
         _expandable(T["en"]["preview_parents"], parents),
         _expandable(T["en"]["preview_staff"], staff),
     ]

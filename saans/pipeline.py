@@ -45,13 +45,50 @@ def load_series_csv(path: Path = REPLAY_CSV) -> Series:
                 for r in csv.DictReader(f)}
 
 
+@dataclass(frozen=True)
+class Backup:
+    """Low-cost sensors used when the CPCB feed is stale (config/stations.yaml)."""
+    sensors: dict[int, float]              # sensor id -> divide_by correction
+    stale_after: timedelta = timedelta(hours=6)
+    min_stations: int = 1
+
+
+@dataclass(frozen=True)
+class LiveData:
+    series: Series
+    source: str                            # "cpcb" | "backup" | "none"
+    latest: datetime | None
+    min_stations: int = 2
+
+
 def live_series(client: OpenAQClient, sensor_ids: list[int], made_at: datetime) -> Series:
     """Enough history for the forecast: 14 shape days plus yesterday and today."""
     start = datetime.combine(made_at.date() - timedelta(days=SHAPE_DAYS + 1), time(0), IST)
     return station_mean(fetch_series(client, sensor_ids, start, made_at))
 
 
-def run_evening(deps: Deps, ctx: Context, series: Series, made_at: datetime, mode: str) -> str:
+def live_data(client: OpenAQClient, sensor_ids: list[int], made_at: datetime,
+              backup: Backup | None = None) -> LiveData:
+    """CPCB first; the backup sensors only if CPCB's newest hour is too old."""
+    cpcb = live_series(client, sensor_ids, made_at)
+    latest = max(cpcb) if cpcb else None
+    if latest and made_at - latest <= (backup.stale_after if backup else timedelta(days=365)):
+        return LiveData(cpcb, "cpcb", latest)
+    if not backup:
+        return LiveData(cpcb, "cpcb" if cpcb else "none", latest)
+    log.warning("CPCB feed stale (newest %s); using backup sensors", latest)
+    start = datetime.combine(made_at.date() - timedelta(days=SHAPE_DAYS + 1), time(0), IST)
+    raw = fetch_series(client, list(backup.sensors), start, made_at)
+    for sid, s in raw.items():
+        s.values = {h: v / backup.sensors[sid] for h, v in s.values.items()}
+    series = station_mean(raw)
+    if not series:
+        return LiveData(cpcb, "none", latest)
+    return LiveData(series, "backup", max(series), backup.min_stations)
+
+
+def run_evening(deps: Deps, ctx: Context, series: Series, made_at: datetime, mode: str,
+                backup_data: bool = False, min_stations: int = 2) -> str:
     """Returns the outcome used by the heartbeat: sent / already_sent / no-action /
     unavailable / not-school-day."""
     target = made_at.astimezone(IST).date() + timedelta(days=1)
@@ -59,7 +96,8 @@ def run_evening(deps: Deps, ctx: Context, series: Series, made_at: datetime, mod
     if mode == "live" and not ctx.calendar.is_school_day(target):
         return "not-school-day"
     try:
-        f = forecast(series, made_at, hours=ctx.school.hour_window(), persistence=True)
+        f = forecast(series, made_at, hours=ctx.school.hour_window(), persistence=True,
+                     min_stations=min_stations)
     except Unavailable as e:
         log.warning("forecast unavailable for %s (%s): %s", target, mode, e)
         deps.messenger.send(principal, messages.render_unavailable(target))
@@ -72,7 +110,8 @@ def run_evening(deps: Deps, ctx: Context, series: Series, made_at: datetime, mod
 
     replay_of = made_at.date() if mode == "replay" else None
     texts = messages.render_plan(plan, ctx.school, replay_of=replay_of,
-                                 summary=summarize(plan, ctx.school, ctx.model_call))
+                                 summary=summarize(plan, ctx.school, ctx.model_call),
+                                 backup_data=backup_data)
     return send_plan(deps, target, mode, texts)
 
 

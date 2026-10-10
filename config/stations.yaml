@@ -16,3 +16,18 @@ stations:
     sensor_id: 12234778   # Mandir Marg, New Delhi - DPCC
   - name: Lodhi Road
     sensor_id: 12234714   # Lodhi Road, New Delhi - IMD
+
+# Backup when the CPCB feed is stale (newest hour older than stale_after_hours).
+# Outdoor AirGradient low-cost sensors on the same OpenAQ API. Each reading is
+# divided by `divide_by`, its median ratio to the CPCB 6-station mean
+# (scripts/fit_fallback.py). Checked out of sample (fit Oct 15-Nov 15 2025,
+# tested Nov 17-Dec 15 2025): the evening forecast caught 91% of >= Very Poor
+# school days with 17% false alarms against CPCB. Excluded: Santushti Apartments,
+# Vasant Kunj (correlation 0.37 with CPCB, likely indoors).
+fallback:
+  stale_after_hours: 6
+  min_stations: 1
+  sensors:
+    - {name: "GK1 (Oberoi Terrace)", sensor_id: 9320367, divide_by: 1.18}
+    - {name: "Sector 1, Noida extension", sensor_id: 14453757, divide_by: 1.14}
+    - {name: "Anand Lok", sensor_id: 14745878, divide_by: 1.29}   # fit on Nov 28-Dec 15 only

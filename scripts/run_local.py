@@ -27,7 +27,6 @@ for k, v in {"AWS_ACCESS_KEY_ID": "local", "AWS_SECRET_ACCESS_KEY": "local",
     os.environ.setdefault(k, v)                               # DynamoDB Local ignores these
 
 import boto3  # noqa: E402
-import yaml  # noqa: E402
 
 from saans import handlers, pipeline, webhook  # noqa: E402
 from saans.calendar import load_calendar  # noqa: E402
@@ -63,9 +62,10 @@ def main() -> None:
         model_call=model_call,
     )
     deps = Deps(store=PlanStore(table), messenger=tg, settings=cfg.settings)
-    stations = yaml.safe_load((ROOT / "config" / "stations.yaml").read_text(encoding="utf-8"))
-    rt = handlers.Runtime(cfg, deps, ctx, [int(s["sensor_id"]) for s in stations["stations"]],
-                          metrics=lambda outcome: log.info("heartbeat: nightly %s", outcome))
+    sensor_ids, backup = handlers.load_stations()
+    rt = handlers.Runtime(cfg, deps, ctx, sensor_ids,
+                          metrics=lambda outcome: log.info("heartbeat: nightly %s", outcome),
+                          backup=backup)
     log.info("Saans running locally (DynamoDB %s, summary %s). Ctrl+C to stop.",
              endpoint, "on" if model_call else "off")
 

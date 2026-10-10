@@ -58,7 +58,7 @@ python scripts/set_webhook.py --stack saans
 
 ## Data
 
-CPCB hourly PM2.5 via the [OpenAQ](https://openaq.org) API, for six Delhi stations (`config/stations.yaml`). `saans/data/replay_2025q4.csv` ships the Oct-Dec 2025 station means so replays work offline.
+CPCB hourly PM2.5 via the [OpenAQ](https://openaq.org) API, for six Delhi stations (`config/stations.yaml`). If the CPCB feed is more than 6 hours old, Saans switches to three outdoor AirGradient sensors on the same API. Each sensor is corrected to CPCB levels (`scripts/fit_fallback.py`). In an out-of-sample check it caught 91% of Very Poor-or-worse days with 17% false alarms. The principal's message says when backup data was used. `saans/data/replay_2025q4.csv` ships the Oct-Dec 2025 station means so replays work offline.
 
 ## Known limits
 

@@ -1,0 +1,18 @@
+# The 6 fixed Delhi CPCB stations used for the replay, backtest and demo school
+# (design doc: "Station set"). sensor_id is the OpenAQ v3 PM2.5 sensor for each
+# location. Each live location lists two PM2.5 sensors; resolved on 2026-09-27
+# with `scripts/compare_sensors.py 2025-11-10`: the other sensor at every
+# station returned no hours for Nov 2025, and these periods are IST-aligned.
+stations:
+  - name: Anand Vihar
+    sensor_id: 12235610   # Anand Vihar, New Delhi - DPCC
+  - name: ITO
+    sensor_id: 12234753   # ITO, New Delhi - CPCB
+  - name: RK Puram
+    sensor_id: 12234787   # R K Puram, Delhi - DPCC
+  - name: Punjabi Bagh
+    sensor_id: 12234796   # Punjabi Bagh, Delhi - DPCC
+  - name: Mandir Marg
+    sensor_id: 12234778   # Mandir Marg, New Delhi - DPCC
+  - name: Lodhi Road
+    sensor_id: 12234714   # Lodhi Road, New Delhi - IMD

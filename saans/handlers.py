@@ -23,7 +23,7 @@ from saans.ingest import IST, OpenAQClient, OpenAQError
 from saans.lifecycle import Deps
 from saans.rules import load_rules
 from saans.school import load_school
-from saans.summary import strands_model_call
+from saans.summary import model_call_from_env
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -55,7 +55,7 @@ def _build_runtime() -> Runtime:
         calendar=load_calendar(ROOT / "backtest" / "calendar_2025.yaml",
                                ROOT / "config" / "calendar_2026.yaml"),
         rules=load_rules(ROOT / "rules.yaml")[0],
-        model_call=strands_model_call(),
+        model_call=model_call_from_env(),
     )
     stations = yaml.safe_load((ROOT / "config" / "stations.yaml").read_text(encoding="utf-8"))
     deps = Deps(store=PlanStore(boto3.resource("dynamodb").Table(cfg.table_name)),

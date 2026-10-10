@@ -54,6 +54,25 @@ class TelegramMessenger:
     def answer_callback(self, callback_id: str, text: str) -> None:
         self._call("answerCallbackQuery", {"callback_query_id": callback_id, "text": text[:200]})
 
+    def get_updates(self, offset: int | None, timeout: int = 25) -> list[dict]:
+        """Long polling for the local runner (no public URL needed)."""
+        payload = {"timeout": timeout, "allowed_updates": ["message", "callback_query"]}
+        if offset is not None:
+            payload["offset"] = offset
+        try:
+            resp = self.session.post(f"{self._base}/getUpdates", json=payload,
+                                     timeout=timeout + self.timeout)
+        except requests.RequestException as e:
+            raise MessengerError(f"getUpdates: {type(e).__name__}") from e
+        body = resp.json()
+        if not body.get("ok"):
+            raise MessengerError(f"getUpdates: {body.get('error_code')} {body.get('description')}")
+        return body.get("result") or []
+
+    def delete_webhook(self) -> None:
+        """Long polling and a webhook can't both be active."""
+        self._call("deleteWebhook", {"drop_pending_updates": False})
+
     def set_webhook(self, url: str, secret_token: str) -> None:
         self._call("setWebhook", {"url": url, "secret_token": secret_token,
                                   "allowed_updates": ["message", "callback_query"],

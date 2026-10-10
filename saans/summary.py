@@ -1,4 +1,5 @@
-"""Optional 2-sentence English summary for the principal (Strands on Bedrock).
+"""Optional 2-sentence English summary for the principal (Strands Agents SDK;
+model: Gemini free tier locally, or Bedrock when deployed on AWS).
 
 The LLM never decides anything: it only restates the plan, and its output is
 validated against actions[] before use (eng R9, design 10A). On any rejection,
@@ -118,20 +119,49 @@ def summarize(plan: Plan, school, call_model: ModelCall | None) -> str | None:
     return text
 
 
-def strands_model_call(model_id: str | None = None, region: str | None = None) -> ModelCall | None:
-    """Strands Agent on Bedrock, or None when no model is configured."""
-    model_id = model_id or os.environ.get("SAANS_BEDROCK_MODEL_ID")
-    if not model_id:
-        log.info("SAANS_BEDROCK_MODEL_ID not set; summaries disabled")
-        return None
+def _agent_call(model) -> ModelCall:
     from strands import Agent
-    from strands.models import BedrockModel
-
-    model = BedrockModel(model_id=model_id, region_name=region or os.environ.get("AWS_REGION"),
-                         max_tokens=200, temperature=0.2)
 
     def call(system_prompt: str, prompt: str) -> str:
         agent = Agent(model=model, system_prompt=system_prompt, callback_handler=None)
         return str(agent(prompt))
 
     return call
+
+
+def gemini_model_call(api_key: str | None = None, model_id: str | None = None) -> ModelCall | None:
+    """Strands Agent on Google Gemini (free API key, no card needed)."""
+    api_key = api_key or os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        log.info("GEMINI_API_KEY not set; summaries disabled")
+        return None
+    from strands.models.gemini import GeminiModel
+
+    model = GeminiModel(client_args={"api_key": api_key},
+                        model_id=model_id or os.environ.get("SAANS_GEMINI_MODEL", "gemini-2.5-flash"),
+                        params={"temperature": 0.2, "max_output_tokens": 200})
+    return _agent_call(model)
+
+
+def model_call_from_env() -> ModelCall | None:
+    """SAANS_SUMMARY_PROVIDER = gemini | bedrock | none (default: gemini if a key is set)."""
+    provider = os.environ.get("SAANS_SUMMARY_PROVIDER",
+                              "gemini" if os.environ.get("GEMINI_API_KEY") else "bedrock")
+    if provider == "gemini":
+        return gemini_model_call()
+    if provider == "bedrock":
+        return strands_model_call()
+    return None
+
+
+def strands_model_call(model_id: str | None = None, region: str | None = None) -> ModelCall | None:
+    """Strands Agent on Bedrock, or None when no model is configured."""
+    model_id = model_id or os.environ.get("SAANS_BEDROCK_MODEL_ID")
+    if not model_id:
+        log.info("SAANS_BEDROCK_MODEL_ID not set; summaries disabled")
+        return None
+    from strands.models import BedrockModel
+
+    model = BedrockModel(model_id=model_id, region_name=region or os.environ.get("AWS_REGION"),
+                         max_tokens=200, temperature=0.2)
+    return _agent_call(model)

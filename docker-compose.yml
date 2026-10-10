@@ -1,0 +1,12 @@
+# DynamoDB Local (Amazon's official image; no AWS account needed).
+# Data persists in ./data/dynamodb between restarts.
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    command: -jar DynamoDBLocal.jar -sharedDb -dbPath /home/dynamodblocal/data
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/dynamodb:/home/dynamodblocal/data
+    user: root
+    restart: unless-stopped

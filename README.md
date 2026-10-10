@@ -15,8 +15,8 @@ CPCB stations (OpenAQ) ─▶ forecast (persistence, as of 18:00) ─▶ rules.y
 - `saans/forecast.py` makes the forecast. It uses only the data available at 18:00. Pure persistence was selected by the backtest (`backtest/run.py`).
 - `rules.yaml` holds the rules. Each rule cites EPA, CPCB or CAQM sources, and adaptations are labelled.
 - `saans/messages.py` and `saans/templates.py` write the messages, in English and Hindi. Parents never see class names or GRAP guesses.
-- `saans/summary.py` adds an optional one- or two-sentence summary from a Strands agent on Amazon Bedrock. The summary is checked against the plan and dropped if it adds anything.
-- `template.yaml` deploys it on AWS: DynamoDB, two Lambdas (the Telegram webhook, and the 18:00 / 06:30 / 07:00 IST crons), a missed-run heartbeat alarm, and secrets in SSM Parameter Store.
+- `saans/summary.py` adds an optional one- or two-sentence summary from a Strands agent (Gemini locally, Amazon Bedrock on AWS). The summary is checked against the plan and dropped if it adds anything.
+- `scripts/run_local.py` runs everything on a laptop. `template.yaml` deploys the same code on AWS: DynamoDB, two Lambdas (the Telegram webhook, and the 18:00 / 06:30 / 07:00 IST crons), a missed-run heartbeat alarm, and secrets in SSM Parameter Store.
 
 "Saans air band" is our PM2.5 forecast mapped onto CPCB bands. It is **not the official AQI**.
 
@@ -28,20 +28,29 @@ python -m pytest -q
 python backtest/run.py        # needs data/raw/pm25_hourly.csv (scripts/backfill.py)
 ```
 
-## Deploy
+## Run it locally (no AWS account, no card)
 
-Prerequisites: an AWS account, the AWS CLI configured, the AWS SAM CLI, Docker, and Bedrock model access if you want the summary.
+This is how the demo runs. It uses the Strands Agents SDK (an AWS open-source tool) with a free Gemini key for the summary, Amazon's DynamoDB Local in Docker, and Telegram long polling, so no public URL is needed.
 
-1. **Telegram:** create a bot with @BotFather, and create a parents' channel and a staff group (plus demo copies for replays). Add the bot as an admin to each.
-2. **Secrets** go in SSM as SecureStrings, never in git:
-   ```bash
-   aws ssm put-parameter --type SecureString --name /saans/telegram_bot_token --value '<token>'
-   aws ssm put-parameter --type SecureString --name /saans/telegram_webhook_secret --value "$(openssl rand -hex 32)"
-   aws ssm put-parameter --type SecureString --name /saans/openaq_api_key --value '<key>'
-   ```
-3. **Deploy.** The first time, run `sam build --use-container && sam deploy --guided --stack-name saans` and enter the Telegram ids and alarm email when asked. After that, `make deploy` builds, deploys and runs the smoke test.
-4. **Connect the bot:** `python scripts/set_webhook.py --stack saans`
-5. **Try it:** as an admin, send the bot `/replay 2025-11-10`.
+1. **Telegram:** create a bot with @BotFather. Create a parents' channel and a staff group, plus demo copies of both, and add the bot as an admin to each.
+2. **Ids:** get the numeric ids for yourself (principal/admin) and the four chats, e.g. by forwarding a message from each to @userinfobot.
+3. `cp .env.example .env` and fill it in. `GEMINI_API_KEY` is optional; it's free at aistudio.google.com.
+4. Start Docker Desktop, then run `docker compose up -d` to start DynamoDB Local.
+5. `python scripts/run_local.py`. Leave it running: the 18:00 plan, the 06:30 reminder and the 07:00 expiry run only while it's on.
+6. Try it: as the admin, send the bot `/replay 2025-11-10`.
+
+## Deploy on AWS (optional)
+
+`template.yaml` deploys the same code as two Lambdas (a Telegram webhook, plus the 18:00 / 06:30 / 07:00 IST crons), DynamoDB, a missed-run alarm and secrets in SSM. It needs an AWS account (and a card):
+
+```bash
+aws ssm put-parameter --type SecureString --name /saans/telegram_bot_token --value '<token>'
+aws ssm put-parameter --type SecureString --name /saans/telegram_webhook_secret --value "$(openssl rand -hex 32)"
+aws ssm put-parameter --type SecureString --name /saans/openaq_api_key --value '<key>'
+sam build --use-container && sam deploy --guided --stack-name saans   # first time
+make deploy                                                           # later: build, deploy, smoke test
+python scripts/set_webhook.py --stack saans
+```
 
 ## Data
 

@@ -1,0 +1,158 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Saans - evening-before air plans for Delhi schools (eng D5)
+
+# Secrets are SecureString parameters you create once (see README):
+#   /saans/telegram_bot_token  /saans/telegram_webhook_secret  /saans/openaq_api_key
+
+Parameters:
+  PrincipalUserId: {Type: String, Description: Telegram user id of the principal}
+  AdminUserIds: {Type: String, Description: Comma-separated Telegram user ids allowed to /replay}
+  ParentChannelId: {Type: String}
+  StaffGroupId: {Type: String}
+  DemoParentChannelId: {Type: String}
+  DemoStaffGroupId: {Type: String}
+  BedrockModelId:
+    Type: String
+    Default: ""
+    Description: Bedrock model or inference-profile id for the optional summary (blank = off)
+  AlarmEmail: {Type: String, Description: Where missed-run and error alarms go}
+  SsmPath: {Type: String, Default: saans, Description: SSM path (no leading slash) holding the secrets}
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [arm64]
+    MemorySize: 512          # Strands Lambda guidance (eng review perf note)
+    Timeout: 60
+    LoggingConfig: {LogFormat: JSON}
+    Environment:
+      Variables:
+        SAANS_TABLE: !Ref PlanTable
+        SAANS_SSM_PREFIX: !Sub "/${SsmPath}"
+        SAANS_PRINCIPAL_USER_ID: !Ref PrincipalUserId
+        SAANS_ADMIN_USER_IDS: !Ref AdminUserIds
+        SAANS_PARENT_CHANNEL_ID: !Ref ParentChannelId
+        SAANS_STAFF_GROUP_ID: !Ref StaffGroupId
+        SAANS_DEMO_PARENT_CHANNEL_ID: !Ref DemoParentChannelId
+        SAANS_DEMO_STAFF_GROUP_ID: !Ref DemoStaffGroupId
+        SAANS_BEDROCK_MODEL_ID: !Ref BedrockModelId
+
+Resources:
+  PlanTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: pk, AttributeType: S}
+        - {AttributeName: sk, AttributeType: S}
+      KeySchema:
+        - {AttributeName: pk, KeyType: HASH}
+        - {AttributeName: sk, KeyType: RANGE}
+
+  WebhookFunction:
+    Type: AWS::Serverless::Function
+    Metadata: {BuildMethod: makefile}
+    Properties:
+      CodeUri: .
+      Handler: saans.handlers.webhook_handler
+      FunctionUrlConfig: {AuthType: NONE}     # every request must carry the Telegram secret token
+      Policies:
+        - DynamoDBCrudPolicy: {TableName: !Ref PlanTable}
+        - SSMParameterReadPolicy: {ParameterName: !Sub "${SsmPath}/*"}
+        - Statement:
+            - Effect: Allow
+              Action: kms:Decrypt
+              Resource: "*"
+              Condition:
+                StringEquals: {kms:ViaService: !Sub "ssm.${AWS::Region}.amazonaws.com"}
+            - Effect: Allow
+              Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
+              Resource: "*"
+
+  ScheduledFunction:
+    Type: AWS::Serverless::Function
+    Metadata: {BuildMethod: makefile}
+    Properties:
+      CodeUri: .
+      Handler: saans.handlers.scheduled_handler
+      Policies:
+        - DynamoDBCrudPolicy: {TableName: !Ref PlanTable}
+        - SSMParameterReadPolicy: {ParameterName: !Sub "${SsmPath}/*"}
+        - CloudWatchPutMetricPolicy: {}
+        - Statement:
+            - Effect: Allow
+              Action: kms:Decrypt
+              Resource: "*"
+              Condition:
+                StringEquals: {kms:ViaService: !Sub "ssm.${AWS::Region}.amazonaws.com"}
+            - Effect: Allow
+              Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
+              Resource: "*"
+      Events:
+        Nightly:       # 18:00 IST
+          Type: Schedule
+          Properties: {Schedule: "cron(30 12 * * ? *)", Input: '{"job": "nightly"}'}
+        Remind:        # 06:30 IST
+          Type: Schedule
+          Properties: {Schedule: "cron(0 1 * * ? *)", Input: '{"job": "remind"}'}
+        Expire:        # 07:00 IST
+          Type: Schedule
+          Properties: {Schedule: "cron(30 1 * * ? *)", Input: '{"job": "expire"}'}
+
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+        - {Protocol: email, Endpoint: !Ref AlarmEmail}
+
+  # Heartbeat (eng R15): alarm when no nightly run completed for 26 hours.
+  MissedNightlyRunAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: No Saans nightly run completed in the last 26 hours
+      Namespace: Saans
+      MetricName: NightlyRunCompleted
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 26
+      DatapointsToAlarm: 26
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  WebhookErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{Name: FunctionName, Value: !Ref WebhookFunction}]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  ScheduledErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{Name: FunctionName, Value: !Ref ScheduledFunction}]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+Outputs:
+  WebhookUrl:
+    Description: Register this with Telegram (scripts/set_webhook.py)
+    Value: !GetAtt WebhookFunctionUrl.FunctionUrl
+  TableName:
+    Value: !Ref PlanTable

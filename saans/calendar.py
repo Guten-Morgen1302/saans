@@ -18,10 +18,19 @@ class SchoolCalendar:
         return day.weekday() in self.school_weekdays and day not in self.holidays
 
 
-def load_calendar(path: Path) -> SchoolCalendar:
-    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-    holidays = {
-        (d if isinstance(d, date) else date.fromisoformat(d)): name
-        for d, name in (raw.get("holidays") or {}).items()
-    }
-    return SchoolCalendar(frozenset(raw["school_weekdays"]), holidays)
+def load_calendar(*paths: Path) -> SchoolCalendar:
+    """Load one or more calendar files; holidays are merged, weekdays must agree."""
+    weekdays, holidays = None, {}
+    for path in paths:
+        raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        days = frozenset(raw["school_weekdays"])
+        if weekdays is not None and days != weekdays:
+            raise ValueError(f"{path}: school_weekdays differ from the other calendar files")
+        weekdays = days
+        holidays.update({
+            (d if isinstance(d, date) else date.fromisoformat(d)): name
+            for d, name in (raw.get("holidays") or {}).items()
+        })
+    if weekdays is None:
+        raise ValueError("no calendar files given")
+    return SchoolCalendar(weekdays, holidays)

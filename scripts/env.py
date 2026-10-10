@@ -1,6 +1,7 @@
 """Tiny .env loader for local scripts (no python-dotenv dependency)."""
 
 import os
+import re
 from pathlib import Path
 
 ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
@@ -14,4 +15,5 @@ def load_env(path: Path = ENV_FILE) -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip())
+        value = re.split(r"\s+#", value, maxsplit=1)[0].strip()   # drop "  # comment"
+        os.environ.setdefault(key.strip(), value)

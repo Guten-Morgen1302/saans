@@ -36,10 +36,10 @@ NUMBER_RE = re.compile(r"\d+(?:[.,]\d+)?")
 BAND_NAMES = sorted(((b.label.lower(), b) for b in Band), key=lambda x: -len(x[0]))
 
 SYSTEM_PROMPT = (
-    "You write one or two short plain sentences for a school principal, summarising "
-    "tomorrow's air plan that is given to you. Use only facts in the plan. Do not add "
+    "You write exactly ONE plain sentence of at most 25 words for a school principal, "
+    "giving the gist of the air plan you are given. Use only facts in the plan. Do not add "
     "numbers, times, class names, advice, reassurance, or any mention of government "
-    "orders. No exclamation marks. Reply with the sentences only."
+    "orders. No exclamation marks. Reply with the sentence only."
 )
 
 ModelCall = Callable[[str, str], str]   # (system_prompt, user_prompt) -> text
@@ -139,7 +139,10 @@ def gemini_model_call(api_key: str | None = None, model_id: str | None = None) -
 
     model = GeminiModel(client_args={"api_key": api_key},
                         model_id=model_id or os.environ.get("SAANS_GEMINI_MODEL", "gemini-2.5-flash"),
-                        params={"temperature": 0.2, "max_output_tokens": 200})
+                        # Gemini 2.5 "thinking" tokens count against max_output_tokens and
+                        # hit MaxTokensReached on a 200 cap; a one-sentence summary needs none.
+                        params={"temperature": 0.2, "max_output_tokens": 1024,
+                                "thinking_config": {"thinking_budget": 0}})
     return _agent_call(model)
 
 

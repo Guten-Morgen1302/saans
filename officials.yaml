@@ -1,0 +1,18 @@
+# Official school-relevant orders, used to mark the replay and report (eng review D3).
+# time_ist is null until the exact publication time is confirmed (design doc open question).
+orders:
+  - date: 2025-11-11
+    time_ist: null
+    stage: GRAP Stage III
+    action: CAQM invokes Stage III in Delhi-NCR (AQI 425 that morning)
+    source: https://www.businesstoday.in/india/story/grap-3-restrictions-in-delhi-schools-directed-to-hold-classes-in-hybrid-mode-for-children-upto-class-5-501666-2025-11-11
+  - date: 2025-11-11
+    time_ist: null
+    stage: DoE circular
+    action: Delhi schools hybrid up to Class V (DE.23(28)/Sch.Br./2025/1004)
+    source: https://www.edudel.nic.in/upload/upload_2025_26/1004_dt_11112025.pdf
+  - date: 2025-12-14
+    time_ist: null
+    stage: CAQM direction
+    action: Outdoor school sports suspended across NCR (re-issued)
+    source: https://www.businesstoday.in/india/story/amid-toxic-air-caqm-orders-halt-on-school-sports-in-delhi-ncr-warns-of-health-dangers-506590-2025-12-14

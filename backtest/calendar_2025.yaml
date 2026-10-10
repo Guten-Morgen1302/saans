@@ -1,0 +1,14 @@
+# Delhi school calendar used for the backtest and the nightly school-day gate
+# (eng review R11). Mon-Sat are school days except the holidays below.
+# Gazetted list: DoE circular dt 20.11.2024
+#   https://www.edudel.nic.in/upload/upload_2023_24/461_66_dt_20112024.pdf
+# Individual schools may also take up to 7 restricted/special holidays; those
+# vary by school and are not modelled.
+school_weekdays: [0, 1, 2, 3, 4, 5]   # Monday=0 .. Saturday=5
+holidays:
+  2025-10-02: Gandhi Jayanti / Dussehra
+  2025-10-20: Diwali
+  2025-10-27: Chhath Puja (notified holiday, GNCTD)
+  2025-11-05: Guru Nanak's Birthday
+  2025-11-25: Guru Tegh Bahadur 350th Shaheedi Diwas (notified holiday)
+  2025-12-25: Christmas

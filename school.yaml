@@ -1,0 +1,23 @@
+# Demo school for v1 (CEO review D4: the timetable lives here, not in a web form).
+# gstack-shortcut(dec-d62fa552): one hardcoded demo school, upgrade when a second real school wants it or after Oct 11.
+# Class health data is counts only, never names (DPDP Act 2023).
+id: demo-delhi-01
+name: Saans Demo School, New Delhi
+calendar: backtest/calendar_2025.yaml
+classes:            # class -> number of students with asthma
+  3B: 4
+  5A: 0
+  7B: 2
+  9A: 1
+
+# Same timetable Monday-Saturday for the demo; weekdays: 0=Mon .. 5=Sat.
+weekdays: [0, 1, 2, 3, 4, 5]
+day:
+  - {name: Assembly, who: school, start: "08:00", end: "08:20", outdoor: true}
+  - {name: PE, who: 3B, start: "08:20", end: "09:00", outdoor: true}
+  - {name: PE, who: 7B, start: "09:00", end: "09:40", outdoor: true}
+  - {name: Maths, who: 7B, start: "08:20", end: "09:00", outdoor: false}
+  - {name: PE, who: 9A, start: "09:40", end: "10:20", outdoor: true}
+  - {name: Recess, who: school, start: "10:40", end: "11:00", outdoor: true}
+  - {name: PE, who: 5A, start: "11:40", end: "12:20", outdoor: true}
+  - {name: PE, who: 3B, start: "13:10", end: "13:50", outdoor: true}

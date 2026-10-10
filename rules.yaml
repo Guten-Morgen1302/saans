@@ -1,0 +1,77 @@
+# Saans rules. The LLM never sets a threshold; every action in a message
+# carries one of these rule IDs (design premise 2).
+#
+# kind:
+#   sourced     - the threshold and action come straight from an official doc
+#   adaptation  - Saans judgment mapping a source onto CPCB bands (cite both)
+#
+# EPA AirNow school chart -> Saans band mapping (adaptation, documented):
+#   "Unhealthy for Sensitive Groups" -> Poor
+#   "Unhealthy"                      -> Very Poor
+#   "Very Unhealthy" and above       -> Severe
+# Rationale: CPCB's Poor band (PM2.5 91-120) is the first where CPCB's health
+# statement mentions breathing discomfort for people with lung disease, which
+# matches EPA's sensitive-groups step; Very Poor and Severe follow the same order.
+#
+# applies_to:
+#   asthma_pe     - PE periods of classes with an asthma count > 0
+#   all_pe        - every PE period
+#   school_events - school-wide outdoor events (assembly, recess)
+#   all_outdoor   - every outdoor period or event
+#   school_hours  - the whole school day (windows, advisories)
+# action: indoor | cancel | windows_closed | grap_advisory
+
+sources:
+  epa_schools: https://www.airnow.gov/publications/air-quality-flag-program-getting-started/air-quality-and-outdoor-activity-guidance-for-schools-flag-program/
+  cpcb_aqi: https://cpcb.nic.in/National-Air-Quality-Index/
+  caqm_grap: https://caqm.nic.in/index1.aspx?lsid=4168&lev=2&lid=4171&langid=1
+  caqm_sports_2025: https://www.businesstoday.in/india/story/amid-toxic-air-caqm-orders-halt-on-school-sports-in-delhi-ncr-warns-of-health-dangers-506590-2025-12-14
+
+rules:
+  - id: asthma-pe-indoor
+    kind: adaptation
+    trigger: POOR
+    applies_to: asthma_pe
+    action: indoor
+    template: pe_indoor
+    sources: [epa_schools, cpcb_aqi]
+
+  - id: pe-indoor
+    kind: adaptation
+    trigger: VERY_POOR
+    applies_to: all_pe
+    action: indoor
+    template: pe_indoor
+    sources: [epa_schools, cpcb_aqi]
+
+  - id: events-indoor
+    kind: adaptation
+    trigger: VERY_POOR
+    applies_to: school_events
+    action: indoor
+    template: event_indoor
+    sources: [epa_schools, cpcb_aqi]
+
+  - id: outdoor-cancel
+    kind: adaptation
+    trigger: SEVERE
+    applies_to: all_outdoor
+    action: cancel
+    template: outdoor_cancel
+    sources: [epa_schools, cpcb_aqi, caqm_sports_2025]
+
+  - id: windows-closed
+    kind: adaptation
+    trigger: VERY_POOR
+    applies_to: school_hours
+    action: windows_closed
+    template: windows_closed
+    sources: [cpcb_aqi, epa_schools]
+
+  - id: grap-likely
+    kind: adaptation
+    trigger: SEVERE
+    applies_to: school_hours
+    action: grap_advisory
+    template: grap_likely
+    sources: [caqm_grap, cpcb_aqi]
